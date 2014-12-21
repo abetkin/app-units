@@ -1,0 +1,45 @@
+#!env python3
+
+'''
+Run unittest and launch ipdb on failures 
+'''
+
+import sys
+import ipdb
+import unittest
+
+
+class DebugFailuresTestLoader(unittest.loader.TestLoader):
+
+    def loadTestsFromTestCase(self, testCaseClass):
+        if issubclass(testCaseClass, unittest.suite.TestSuite):
+            raise TypeError("Test cases should not be derived from "
+                            "TestSuite. Maybe you meant to derive from "
+                            "TestCase?")
+        testCaseNames = self.getTestCaseNames(testCaseClass)
+        if not testCaseNames and hasattr(testCaseClass, 'runTest'):
+            testCaseNames = ['runTest']
+
+        def test_functions():
+            for method_name in testCaseNames:
+                test_func = getattr(testCaseClass, method_name)
+                yield method_name, ipdb.launch_ipdb_on_exception()(test_func)
+        # TODO: instantiate class in orig. module
+        testcase_class = type('Pdb' + testCaseClass.__name__, (testCaseClass,),
+                              dict(test_functions()))
+        return self.suiteClass(map(testcase_class, testCaseNames))
+
+    def _get_module_from_name(self, name):
+        with ipdb.launch_ipdb_on_exception():
+            return super()._get_module_from_name(name)
+
+if __name__ == '__main__':
+    kw = {}
+    if '--ipdb' in  sys.argv:
+        sys.argv.remove('--ipdb')
+        kw.update(testLoader=DebugFailuresTestLoader())
+    
+    unittest.main(
+        module=None,
+        **kw
+        )

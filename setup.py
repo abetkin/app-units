@@ -8,9 +8,7 @@ with codecs.open('README.md', encoding='utf-8') as f:
     long_description = f.read()
 
 setup(
-    name="applets",
-    install_requires=[
-    ],
+    name="appunits",
 
     # There are various approaches to referencing the version. For a discussion,
     # see http://packaging.python.org/en/latest/tutorial.html#version
@@ -20,7 +18,7 @@ setup(
     long_description=long_description,
 
     # The project URL.
-    url='https://github.com/abetkin/applets',
+    url='https://github.com/abetkin/appunits',
 
     # Author details
     author='abetkin',
@@ -46,12 +44,9 @@ setup(
         'Programming Language :: Python :: 3.4',
     ],
 
-    # What does your project relate to?
-    keywords='applets',
-
     # You can just specify the packages manually here if your project is
     # simple. Or you can use find_packages.
-    packages=["applets"],
+    packages=["appunits"],
 
     # List run-time dependencies here.  These will be installed by pip when your
     # project is installed.
