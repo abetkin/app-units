@@ -1,4 +1,12 @@
 from .util.mro import _mro
+from .util import to
+
+class UnitsRunner(object):
+
+    def __init__(self, units):
+        self.units = {}
+        for u in units:
+            self.units[u.identity] = u
 
 
 class AppUnit(object):
@@ -6,12 +14,14 @@ class AppUnit(object):
     deps = ()
 
     def __init__(self, deps=None, identity=None):
+        # Init the config. Optional
+        #
         if deps is not None:
             self.deps = deps
         if identity is not None:
-            self.identity = identity 
+            self.identity = identity
         assert self.identity is not None, "App unit should have an identity."
-    
+
     # FIXME view is always the context
 
     def _get_parents(self):
@@ -26,16 +36,23 @@ class AppUnit(object):
         return self()
 
     @classmethod
-    def run_units(cls, *units):
-        unit = 0
-        issubclass(unit, AppUnit)
+    def _define_order(cls, *units):
+        #
+        deps = {}
+        for u in unit
+        units = [u for u in units if isinstance(u, AppUnit)]
+
+        @to(dict)
+        def deps():
+            u.deps
+
 
 
 class ContextAttribute:
     '''
     An attribute that is looked up in the (parent) context.
 
-    "__pro__" stays for "parent resolution order". 
+    "__pro__" stays for "parent resolution order".
     '''
 
     PUBLISHED_CONTEXT_ATTR = 'published_context'
@@ -54,7 +71,7 @@ class ContextAttribute:
             published_context = getattr(obj, self.PUBLISHED_CONTEXT_ATTR, ())
             if self.name in published_context:
                return getattr(obj, self.name)
-            published_context_extra = getattr(obj, 
+            published_context_extra = getattr(obj,
                     self.PUBLISHED_CONTEXT_EXTRA_ATTR, ()) # normally a dict
             if self.name in published_context_extra:
                return obj.published_context_extra[self.name]
