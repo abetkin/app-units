@@ -1,4 +1,5 @@
 from appunits import ContextAttribute
+from appunits.util import case
 
 class A:
 
@@ -16,5 +17,5 @@ class B:
     a = ContextAttribute('a')
 
 b_inst = B()
-assert b_inst.a == 1
+case.assertEqual(b_inst.a, 1)
 

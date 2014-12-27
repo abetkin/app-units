@@ -1,11 +1,11 @@
-def dep(arg):
+def sort_by_deps(deps_dict):
     '''
         Dependency resolver
 
-    "arg" is a dependency dictionary in which
+    "deps_dict" is a dependency dictionary in which
     the values are the dependencies of their respective keys.
     '''
-    d=dict((k, set(arg[k])) for k in arg)
+    d=dict((k, set(deps_dict[k])) for k in deps_dict)
     r=[]
     while d:
         # values not in keys (items without dep)
@@ -27,4 +27,4 @@ if __name__=='__main__':
         g=('h','f'),
         i=('f',)
     )
-    print dep(d)
+    print(sort_by_deps(d))

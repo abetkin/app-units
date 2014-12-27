@@ -1,28 +1,64 @@
 from .util.mro import _mro
-from .util import to
+from .util.deps import sort_by_deps
 
 class UnitsRunner(object):
 
     def __init__(self, units):
-        self.units = {}
-        for u in units:
-            self.units[u.identity] = u
+        self.units = units
+
+    # TODO identity policy
+
+    def get_units_order(self):
+
+        def add_units(units, result):
+            for unit in units:
+                if unit in result:
+                    # TODO forbid units with the same identity'
+                    continue
+                result[unit] = unit.deps
+                add_units(unit.deps, result)
+
+        deps_dict = {}
+        add_units(self.units, deps_dict)
+
+        def units_ordered():
+            for units in sort_by_deps(deps_dict):
+                yield from units
+
+        return list(units_ordered())
+                    
+
+class ClassIdentity(object):
+
+    def __init__(self, cls):
+        self.cls = cls
+
+    def __str__(self):
+        return self.cls.__name__
+
+    __repr__ = __str__
+
 
 
 class AppUnit(object):
 
-    deps = ()
+    # deps = ()
+    # identity = None
 
-    def __init__(self, deps=None, identity=None):
+    def __init__(self, deps=(), identity=None):
         # Init the config. Optional
         #
-        if deps is not None:
-            self.deps = deps
-        if identity is not None:
-            self.identity = identity
-        assert self.identity is not None, "App unit should have an identity."
+        self.deps = deps
+        self.identity = identity
 
     # FIXME view is always the context
+
+    def get_identity(self):
+        return self.identity if self.identity is not None \
+                else ClassIdentity(self.__class__)
+
+    def __hash__(self):
+        return hash(self.get_identity())
 
     def _get_parents(self):
         return self.deps # TODO not always
@@ -35,17 +71,8 @@ class AppUnit(object):
         self.__pro__ = _mro(self._get_parents(), get_mro=self._get_pro())
         return self()
 
-    @classmethod
-    def _define_order(cls, *units):
-        #
-        deps = {}
-        for u in unit
-        units = [u for u in units if isinstance(u, AppUnit)]
-
-        @to(dict)
-        def deps():
-            u.deps
-
+    def __repr__(self):
+        return repr(self.get_identity())
 
 
 class ContextAttribute:
