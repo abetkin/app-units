@@ -16,6 +16,53 @@ class ClassIdentity(object):
     __repr__ = __str__
 
 
+def instantiate(*units):
+        result = [unit() if isinstance(unit, type) else unit
+                  for unit in units]
+        if len(units) == 1:
+            return result[0]
+        return result
+
+class UnitsRunner(object):
+
+    def __init__(self, units):
+        self.units = units
+
+    def get_deps(self, unit, result=None):
+        if result is None:
+            result = []
+        unit = instantiate(unit)
+
+        for unit in instantiate(unit.deps):
+            if unit in result:
+                # TODO forbid units with the same identity
+                continue
+            result.append(unit)
+            result.extend(self.get_deps(unit, result))
+        return result
+
+    def prepare(self):
+        deps_dict = {u: self.get_deps(u) for u in self.units}
+
+        def ordered_units():
+            for units in sort_by_deps(deps_dict):
+                yield from units
+
+        return list(ordered_units())
+
+
+
+
+    def run(self):
+        self.all_units = self.prepare()
+        # TODO error handling
+        for unit in self.all_units:
+            try:
+                unit.run()
+            finally:
+                print("App: %s" % unit.identity)
+
+
 class AppUnit(object):
     '''
     Is instantiated at the "prepare" stage.
@@ -30,29 +77,11 @@ class AppUnit(object):
 
     # TODO be able exclude context from some apps
 
-    @classmethod
-    def reorder(cls, units):
-        all_units = {}
+    def __hash__(self):
+        return hash(self.identity)
 
-        def get_deps(unit, result=None):
-            all_units.setdefault(unit.identity, unit)
-            if result is None:
-                result = []
-            for unit in unit.deps:
-                if unit in result:
-                    # TODO forbid units with the same identity
-                    continue
-                result.append(unit.identity)
-                result.extend(get_deps(unit, result))
-            return result
-
-        deps_dict = {u.identity: get_deps(u) for u in units}
-
-        def units_order():
-            for units in sort_by_deps(deps_dict):
-                yield from units
-
-        return [all_units[id] for id in units_order()]
+    def run(self):
+        raise NotImplementedError()
 
     @staticmethod
     def _get_pro(obj):
@@ -65,8 +94,9 @@ class AppUnit(object):
     def __repr__(self):
         return repr(self.identity)
 
-    def _run(self):
-        'Assume all the dependencies satisfied'
+    def __call__(self):
+        self.result = self.run()
+        return self.result
 
 
 
