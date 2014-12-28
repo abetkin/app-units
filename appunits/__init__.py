@@ -49,16 +49,15 @@ class AppUnit(object):
         # Init the config. Optional
         #
         self.deps = deps
-        self.identity = identity
+        if identity is not None:
+            # property?
+            self.identity = identity
+        else:
+            self.identity = ClassIdentity(self.__class__)
 
-    # FIXME view is always the context
-
-    def get_identity(self):
-        return self.identity if self.identity is not None \
-                else ClassIdentity(self.__class__)
 
     def __hash__(self):
-        return hash(self.get_identity())
+        return hash(self.identity)
 
     def _get_parents(self):
         return self.deps # TODO not always
@@ -72,7 +71,11 @@ class AppUnit(object):
         return self()
 
     def __repr__(self):
-        return repr(self.get_identity())
+        return repr(self.identity)
+
+    def _run(self):
+        'Assume all the dependencies satisfied'
+        
 
 
 class ContextAttribute:
