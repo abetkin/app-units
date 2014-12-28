@@ -1,32 +1,6 @@
 from .util.mro import _mro
 from .util.deps import sort_by_deps
 
-class UnitsRunner(object):
-
-    def __init__(self, units):
-        self.units = units
-
-    # TODO identity policy
-
-    def get_units_order(self):
-
-        def add_units(units, result):
-            for unit in units:
-                if unit in result:
-                    # TODO forbid units with the same identity'
-                    continue
-                result[unit] = unit.deps
-                add_units(unit.deps, result)
-
-        deps_dict = {}
-        add_units(self.units, deps_dict)
-
-        def units_ordered():
-            for units in sort_by_deps(deps_dict):
-                yield from units
-
-        return list(units_ordered())
-                    
 
 class ClassIdentity(object):
 
@@ -36,46 +10,64 @@ class ClassIdentity(object):
     def __str__(self):
         return self.cls.__name__
 
+    def __hash__(self):
+        return hash(self.cls)
+
     __repr__ = __str__
 
 
-
 class AppUnit(object):
+    '''
+    Is instantiated at the "prepare" stage.
+    '''
 
-    # deps = ()
-    # identity = None
-
-    def __init__(self, deps=(), identity=None):
-        # Init the config. Optional
-        #
-        self.deps = deps
+    def __init__(self, identity=None, deps=()):
         if identity is not None:
-            # property?
             self.identity = identity
         else:
             self.identity = ClassIdentity(self.__class__)
+        self.deps = deps
 
+    # TODO be able exclude context from some apps
 
-    def __hash__(self):
-        return hash(self.identity)
+    @classmethod
+    def reorder(cls, units):
+        all_units = {}
 
-    def _get_parents(self):
-        return self.deps # TODO not always
+        def get_deps(unit, result=None):
+            all_units.setdefault(unit.identity, unit)
+            if result is None:
+                result = []
+            for unit in unit.deps:
+                if unit in result:
+                    # TODO forbid units with the same identity
+                    continue
+                result.append(unit.identity)
+                result.extend(get_deps(unit, result))
+            return result
+
+        deps_dict = {u.identity: get_deps(u) for u in units}
+
+        def units_order():
+            for units in sort_by_deps(deps_dict):
+                yield from units
+
+        return [all_units[id] for id in units_order()]
 
     @staticmethod
     def _get_pro(obj):
         return getattr(obj, '__pro__', ())
 
-    def run(self):
-        self.__pro__ = _mro(self._get_parents(), get_mro=self._get_pro())
-        return self()
+    # def run(self):
+    #     self.__pro__ = _mro(self._get_parents(), get_mro=self._get_pro())
+    #     return self()
 
     def __repr__(self):
         return repr(self.identity)
 
     def _run(self):
         'Assume all the dependencies satisfied'
-        
+
 
 
 class ContextAttribute:
