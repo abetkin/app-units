@@ -13,36 +13,29 @@ class ClassIdentity(object):
     def __hash__(self):
         return hash(self.cls)
 
+    def __eq__(self, other):
+        if isinstance(other, ClassIdentity):
+            return self.cls == other.cls
+        return self.cls == other
+
     __repr__ = __str__
 
 
-def instantiate(*units):
-        result = [unit() if isinstance(unit, type) else unit
-                  for unit in units]
-        if len(units) == 1:
-            return result[0]
-        return result
+def instantiate(units):
+    return [unit() if isinstance(unit, type) else unit
+            for unit in units]
+
 
 class UnitsRunner(object):
 
     def __init__(self, units):
-        self.units = units
+        self.units = instantiate(units)
 
-    def get_deps(self, unit, result=None):
-        if result is None:
-            result = []
-        unit = instantiate(unit)
-
-        for unit in instantiate(unit.deps):
-            if unit in result:
-                # TODO forbid units with the same identity
-                continue
-            result.append(unit)
-            result.extend(self.get_deps(unit, result))
-        return result
+    def get_pro(self, unit):
+        1
 
     def prepare(self):
-        deps_dict = {u: self.get_deps(u) for u in self.units}
+        deps_dict = {u: u.get_deps() for u in self.units}
 
         def ordered_units():
             for units in sort_by_deps(deps_dict):
@@ -65,20 +58,40 @@ class UnitsRunner(object):
 
 class AppUnit(object):
     '''
-    Is instantiated at the "prepare" stage.
     '''
 
-    def __init__(self, identity=None, deps=()):
+    def __init__(self, identity=None, deps=(),
+                 parents=None):
         if identity is not None:
             self.identity = identity
         else:
             self.identity = ClassIdentity(self.__class__)
-        self.deps = deps
+        self.deps = instantiate(deps)
+        if parents is None:
+            self.parents = self.deps
+        else:
+            self.parents = instantiate(parents)
+
+    def get_deps(self, result=None):
+        if result is None:
+            result = []
+        for unit in self.deps:
+            if unit in result:
+                # TODO forbid units with the same identity
+                continue
+            result.append(unit)
+            result.extend(unit.get_deps(result))
+        return result
 
     # TODO be able exclude context from some apps
 
     def __hash__(self):
         return hash(self.identity)
+
+    def __eq__(self, other):
+        if isinstance(other, AppUnit):
+            return self.identity == other.identity
+        return self.identity == other
 
     def run(self):
         raise NotImplementedError()
