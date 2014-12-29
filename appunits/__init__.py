@@ -44,11 +44,12 @@ class UnitsRunner(object):
 
 
     def run(self):
-        self.all_units = self.prepare()
+        self.all_units = self.prepare() # better be dict
         # TODO error handling
         for unit in self.all_units:
             try:
-                unit.run()
+
+                unit()
             finally:
                 print("App: %s" % unit.identity)
 
@@ -64,10 +65,12 @@ class AppUnit(object):
         else:
             self.identity = ClassIdentity(self.__class__)
         self.deps = instantiate(deps)
-        if parents is None:
+        if parents is not None:
+            self.parents = parents
+        if self.parents is None:
             self.parents = self.deps
         else:
-            self.parents = instantiate(parents)
+            self.parents = instantiate(self.parents)
 
     def get_deps(self, result=None):
         if result is None:
