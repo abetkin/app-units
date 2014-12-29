@@ -5,25 +5,25 @@ def _mro(bases, get_mro=lambda cls: cls.__mro__):
     seqs = [list(get_mro(C)) for C in bases] + [list(bases)]
     res = []
     while True:
-      non_empty = list(filter(None, seqs))
-      if not non_empty:
-          # Nothing left to process, we're done.
-          return tuple(res)
-      for seq in non_empty:  # Find merge candidates among seq heads.
-          candidate = seq[0]
-          not_head = [s for s in non_empty if candidate in s[1:]]
-          if not_head:
-              # Reject the candidate.
-              candidate = None
-          else:
-              break
-      if not candidate:
+        non_empty = list(filter(None, seqs))
+        if not non_empty:
+            # Nothing left to process, we're done.
+            return tuple(res)
+        for seq in non_empty:  # Find merge candidates among seq heads.
+            candidate = seq[0]
+            not_head = [s for s in non_empty if candidate in s[1:]]
+            if not_head:
+                # Reject the candidate.
+                candidate = None
+            else:
+                break
+        if not candidate:
           raise TypeError("inconsistent hierarchy, no C3 MRO is possible")
-      res.append(candidate)
-      for seq in non_empty:
-          # Remove candidate.
-          if seq[0] == candidate:
-              del seq[0]
+        res.append(candidate)
+        for seq in non_empty:
+            # Remove candidate.
+            if seq[0] == candidate:
+                del seq[0]
 
 
 def mro(*bases):

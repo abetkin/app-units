@@ -31,9 +31,6 @@ class UnitsRunner(object):
     def __init__(self, units):
         self.units = instantiate(units)
 
-    def get_pro(self, unit):
-        1
-
     def prepare(self):
         deps_dict = {u: u.get_deps() for u in self.units}
 
@@ -85,6 +82,10 @@ class AppUnit(object):
 
     # TODO be able exclude context from some apps
 
+    def get_pro(self):
+        return _mro(self.parents,
+                    lambda obj: getattr(obj, '__pro__', ()))
+
     def __hash__(self):
         return hash(self.identity)
 
@@ -96,18 +97,11 @@ class AppUnit(object):
     def run(self):
         raise NotImplementedError()
 
-    @staticmethod
-    def _get_pro(obj):
-        return getattr(obj, '__pro__', ())
-
-    # def run(self):
-    #     self.__pro__ = _mro(self._get_parents(), get_mro=self._get_pro())
-    #     return self()
-
     def __repr__(self):
         return repr(self.identity)
 
     def __call__(self):
+        self.__pro__ = self.get_pro()
         self.result = self.run()
         return self.result
 
