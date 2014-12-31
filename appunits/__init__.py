@@ -1,6 +1,7 @@
 from .util.mro import _mro
-from .util.deps import sort_by_deps
+from .util.deps import sort_by_deps, breadth_first
 
+from functools import partial
 
 # class ClassIdentity(object):
 
@@ -25,24 +26,27 @@ def instantiate(units):
     return [unit() if isinstance(unit, type) else unit
             for unit in units]
 
-
+# TODO remove
 class UnitsRunner(object):
 
     def __init__(self, units):
         self.units = {u.identity: u for u in instantiate(units)}
 
-    def prepare(self):
+    def traverse_deps(self):
+        '''
+        breadth-first
+        '''
 
         def deps_dict():
             for name, unit  in tuple(self.units.items()):
                 def deps():
                     for dep in unit.get_deps():
-                        self.units.setdefault(dep.identity, dep)
-                        yield dep.identity, dep
+                        self.units.setdefault(dep.identity, dep) # TOTO process deps
+                        yield dep.identity
                 yield name, list(deps())
-        
+
         deps_dict = dict(deps_dict())
-        
+
         def ordered_units():
             for units in sort_by_deps(deps_dict):
                 yield from units
@@ -69,15 +73,21 @@ class AppUnit(object):
     '''
     '''
 
-    parents = None # TODO deps
+    deps = ()
+    parents = None
 
-    def __init__(self, identity=None, deps=(),
-                 parents=None):
+    # app should create its dependencies
+
+    # possibility to add global deps
+    def __init__(self, identity=None, deps=None, parents=None):
+        #FIXME do not instantiate
         if identity is not None:
             self.identity = identity
         else:
             self.identity = self.__class__
-        self.deps = instantiate(deps)
+        if deps is not None:
+            self.deps = deps
+        self.deps = instantiate(self.deps)
         if parents is not None:
             self.parents = parents
         if self.parents is None:
@@ -85,18 +95,31 @@ class AppUnit(object):
         else:
             self.parents = instantiate(self.parents)
 
-    def get_deps(self, result=None):
-        if result is None:
-            result = []
-        for unit in self.deps:
-            if unit in result:
-                # TODO forbid units with the same identity
-                continue
-            result.append(unit)
-            result.extend(unit.get_deps(result))
-        return result
+    # names only
+    # def get_deps(self, result=None):
+
+    #     if result is None:
+    #         result = []
+    #     for unit in self.deps:
+    #         if unit in result:
+    #             # TODO forbid units with the same identity
+    #             continue
+    #         result.append(unit)
+    #         unit.get_deps(result)
+    #     return result
 
     # TODO be able exclude context from some apps
+
+    def _create_deps(self, already_created):
+        # take iden. into account, stateful
+        if self.identity in already_created:
+            return iter(())
+        return iter(self.deps)
+
+    def traverse_deps(self):
+        registry = set()
+        get_children = partial(AppUnit._get_deps, registry=registry)
+        breadth_first(self, get_children)
 
     def get_pro(self):
         return _mro(self.parents,
@@ -105,8 +128,8 @@ class AppUnit(object):
     def run(self):
         raise NotImplementedError()
 
-    # def __repr__(self):
-    #     return repr(self.identity)
+    def __repr__(self):
+        return 'Unit %s' % repr(self.identity)
 
     def __call__(self):
         self.__pro__ = self.get_pro()

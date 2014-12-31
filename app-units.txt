@@ -10,3 +10,6 @@ custom lookup policy
 #
 
 implicit & late app calls
+get_mro should be available without running modules
+
+app exec. on demand but track that not load an app twise

@@ -8,7 +8,10 @@ c = App('c', [a, b])
 runner = UnitsRunner([a, c])
 units = runner.prepare()
 
-case.assertSequenceEqual(units, [a, b, c])
+case.assertEqual(len(units), 3)
+case.assertSequenceEqual(
+    set(units.values()),
+    {a, b, c})
 
 
 ###
@@ -18,4 +21,4 @@ class MyApp(App):
 
 runner = UnitsRunner([MyApp])
 all_units = runner.prepare()
-case.assertEqual(all_units.index(MyApp), 0)
+assert isinstance(all_units[MyApp], MyApp)
