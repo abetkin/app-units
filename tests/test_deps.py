@@ -1,24 +1,22 @@
-from appunits import AppUnit as App, UnitsRunner
+from appunits import AppUnit as App
 from appunits.util import case
 
-a = App('a', [])
-b = App('b', [a])
-c = App('c', [a, b])
+a = App('a')
+b = App('b', {a})
+c = App('c', {a, b})
 
-runner = UnitsRunner([a, c])
-units = runner.prepare()
+class Main(App):
+    deps = {a, c}
 
-case.assertEqual(len(units), 3)
-case.assertSequenceEqual(
-    set(units.values()),
-    {a, b, c})
+main = Main()
 
+units, deps_dict = main.traverse_deps()
 
-###
+# case.assertEqual(len(units), 3)
+case.assertSequenceEqual(units, {a, b, c})
 
-class MyApp(App):
-    pass
+print(deps_dict)
 
-runner = UnitsRunner([MyApp])
-all_units = runner.prepare()
-assert isinstance(all_units[MyApp], MyApp)
+##
+
+main.run()
