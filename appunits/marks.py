@@ -39,9 +39,8 @@ class Mark(metaclass=ABCMeta):
 
 class CollectMarksMeta(type):
     '''
-    A metaclass that collects `Mark` instances from the classdict
-    and puts them in `_marks` attribute, so that their names
-    won't collide with regular methods' names.
+    The metaclass collects `Mark` instances from the classdict
+    and then removes from the class namespace.
     '''
 
     @classmethod
