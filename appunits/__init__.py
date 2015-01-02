@@ -10,18 +10,17 @@ class AppUnit(object):
     deps = set()
     parents = None
 
-    # TODO convert to sets
     def __init__(self, identity=None, deps=None, parents=None):
         if identity is not None:
             self.identity = identity
         else:
             self.identity = self.__class__
         if deps is not None:
-            self.deps = deps
+            self.deps = set(deps)
         if parents is not None:
-            self.parents = parents
+            self.parents = set(parents)
         if self.parents is None:
-            self.parents = self.deps.copy()
+            self.parents = set(self.deps)
 
     @property
     def propagated_parents(self):
@@ -49,8 +48,9 @@ class AppUnit(object):
         deps = breadth_first(self, AppUnit.create_deps, log=log)
         # TODO if cycles, raise exc
         next(deps)
-        return (set(deps), # FIXME: take first
-                deps_dict)
+        deps_set = set()
+        deps_set.update(deps)
+        return deps_set, deps_dict
 
     def get_pro(self):
         return _mro(self.parents,
