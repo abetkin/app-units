@@ -7,7 +7,7 @@ from django.http import HttpResponse, JsonResponse
 
 from rest_framework import generics, serializers
 
-from appunits import AppUnit, UnitsRunner, ContextAttribute
+from appunits import AppUnit, ContextAttribute
 
 class Filter(AppUnit):
     1
@@ -24,7 +24,7 @@ class Serialize(AppUnit):
         if srlzer.is_valid():
             return srlzer.data
 
-    def run(self):
+    def main(self):
         return self.get_object()
 
 
@@ -32,15 +32,13 @@ class AppAwareView(View):
 
     app_units = ()
     published_context = ('request',)
+    propagate = True
+
 
 
     def dispatch(self, request, *args, **kwargs):
-        app, = self.app_units
-        app.parents = (self,)
-        app_runner = UnitsRunner(self.app_units)
-
-        app_runner.run()
-        self.apps = app_runner.all_units
+        self.app = AppUnit('main', self.app_units, [self])
+        self.app.run()
         return super(AppAwareView, self).dispatch(request, *args, **kwargs)
 
 
@@ -49,7 +47,7 @@ class ShowCats(AppAwareView):
     app_units = (Serialize,)
 
     def get(self, request):
-        obj = self.apps[Serialize].result
+        obj = self.app.all_deps[Serialize].result
         return JsonResponse(obj)
 
 show_cats = ShowCats.as_view()

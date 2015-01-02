@@ -10,6 +10,7 @@ class AppUnit(object):
     deps = set()
     parents = None
 
+    # TODO convert to sets
     def __init__(self, identity=None, deps=None, parents=None):
         if identity is not None:
             self.identity = identity
@@ -20,7 +21,7 @@ class AppUnit(object):
         if parents is not None:
             self.parents = parents
         if self.parents is None:
-            self.parents = self.deps
+            self.parents = self.deps.copy()
 
     @property
     def propagated_parents(self):
@@ -28,6 +29,7 @@ class AppUnit(object):
                 if getattr(parent, 'propagate', False)]
 
     def create_deps(self):
+
         for dep in self.deps:
             if isinstance(dep, type):
                 dep = dep()
@@ -70,16 +72,18 @@ class AppUnit(object):
             return self.identity == other.identity
 
     def run(self):
-        self.all_deps, deps_dict = self.traverse_deps()
-        for dep in self.all_deps:
+        all_deps, deps_dict = self.traverse_deps()
+        self.all_deps = {dep.identity: dep
+                         for dep in all_deps}
+        for dep in all_deps:
             deps_dict.setdefault(dep.identity, set())
+
         def ordered_units():
             for units in sort_by_deps(deps_dict):
                 yield from units
 
-        all_deps = dict(((u.identity, u) for u in self.all_deps))
         for dep_name in ordered_units():
-            dep = all_deps[dep_name]
+            dep = self.all_deps[dep_name]
             dep.run()
         self.__pro__ = self.get_pro()
         self.result = self.main()
