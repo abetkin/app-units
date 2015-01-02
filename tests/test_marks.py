@@ -10,7 +10,7 @@ class custom(mark):
 
     def build(self, app):
         if self.source_function:
-            return int(self.source_function(app))
+            return int(self.source_function())
         return int(self.value)
 
 
@@ -19,7 +19,7 @@ class MarkedApp(AppUnit):
     mark1 = mark2 = custom(value=1)
 
     @custom()
-    def mark3(owner):
+    def mark3():
         return 2
 
 case.assertSequenceEqual(
