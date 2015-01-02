@@ -1,2 +1,2 @@
 from .base import AppUnit, ContextAttribute
-from .marks import mark
+from .marks import Mark
