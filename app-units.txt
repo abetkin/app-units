@@ -15,3 +15,5 @@ get_mro should be available without running modules
 app exec. on demand but track that not load an app twise
 
 ability to turn off auto-resolving deps
+
+if is not an app, do not run, just use

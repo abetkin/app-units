@@ -13,14 +13,14 @@ class Filter(AppUnit):
     1
 
 class Serialize(AppUnit):
-    request = ContextAttribute('request')
+    data = ContextAttribute('request_params')
 
     class _Serializer(serializers.Serializer):
         name = serializers.CharField()
         happy = serializers.BooleanField()
 
     def get_object(self):
-        srlzer = self._Serializer(data=self.request.GET)
+        srlzer = self._Serializer(data=self.data)
         if srlzer.is_valid():
             return srlzer.data
 
@@ -31,9 +31,12 @@ class Serialize(AppUnit):
 class AppAwareView(View):
 
     app_units = ()
-    published_context = ('request',)
+    published_context = ('request_params',)
     propagate = True
 
+    @property
+    def request_params(self):
+        return self.request.GET
 
 
     def dispatch(self, request, *args, **kwargs):
