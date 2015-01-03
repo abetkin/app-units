@@ -1,4 +1,5 @@
 from functools import partial
+from collections import OrderedDict
 
 
 from .util.mro import _mro
@@ -9,7 +10,7 @@ from .marks import CollectMarksMeta
 class AppUnit(metaclass=CollectMarksMeta):
     '''
     '''
-
+    # states: prepared, app1, app2, ...
     deps = set()
     parents = None
 
@@ -24,36 +25,52 @@ class AppUnit(metaclass=CollectMarksMeta):
             self.parents = set(parents)
         if self.parents is None:
             self.parents = set(self.deps)
+        self.state = '-'
 
     @property
     def propagated_parents(self):
         return [parent for parent in self.parents
                 if getattr(parent, 'propagate', False)]
 
-    def create_deps(self):
-
-        for dep in self.deps:
+    def _instantiate_deps(self):
+        '''
+        '''
+        deps = tuple(self.deps.pop() for i in range(len(self.deps)))
+        for dep in deps:
             if isinstance(dep, type) and issubclass(dep, AppUnit):
                 dep = dep()
             dep.parents.update(self.propagated_parents)
+            self.deps.add(dep)
             yield dep
+            # TODO is not exhausted
 
-    def traverse_deps(self):
-        '''breadth-first
-        '''
-        deps_dict = {}
 
-        def log(unit, dep):
-            if unit == self:
-                return
-            deps_dict.setdefault(unit.identity, set()).add(dep.identity)
+    def prepare(self):
+        # TODO comments
+        all_deps = breadth_first(self, AppUnit._instantiate_deps)
+        next(all_deps)
+        all_deps = {dep.identity: dep for dep in all_deps}
 
-        deps = breadth_first(self, AppUnit.create_deps, log=log)
-        # TODO if cycles, raise exc
-        next(deps)
-        deps_set = set()
-        deps_set.update(deps)
-        return deps_set, deps_dict
+        deps_dict = {dep.identity: tuple(d.identity for d in dep.deps)
+                     for dep in all_deps.values()}
+
+        def units():
+            for units in sort_by_deps(deps_dict):
+                for name in units:
+                    yield all_deps[name]
+            yield self
+
+        units = list(units())
+
+        for unit in units:
+            assert all(dep.state == 'prepared' for dep in unit.deps)
+            deps_of_deps = {d.identity for dep in unit.deps for d in dep.deps}
+            unit.deps = deps_of_deps | {dep.identity for dep in unit.deps}
+            unit.deps = (all_deps[name] for name in unit.deps)
+            unit.deps = sorted(unit.deps, key=units.index)
+            unit.deps = OrderedDict((d.identity, d) for d in unit.deps)
+            unit.__pro__ = unit.get_pro()
+            unit.state = 'prepared'
 
     def get_pro(self):
         return _mro(self.parents,
@@ -67,6 +84,8 @@ class AppUnit(metaclass=CollectMarksMeta):
     def __repr__(self):
         return 'Unit %s' % repr(self.identity)
 
+    __str__ = __repr__
+
     def __hash__(self):
         return hash(self.identity)
 
@@ -74,26 +93,23 @@ class AppUnit(metaclass=CollectMarksMeta):
         if isinstance(other, AppUnit):
             return self.identity == other.identity
 
+    # Recursion should happen only when traversing
+    #
+
+    def __iter__(self):
+        assert self.state == 'prepared'
+        return iter(self.deps.values())
+
+
     def run(self):
-        all_deps, deps_dict = self.traverse_deps()
-        self.all_deps = {dep.identity: dep
-                         for dep in all_deps}
-        for dep in all_deps:
-            deps_dict.setdefault(dep.identity, set())
-
-        def ordered_units():
-            for units in sort_by_deps(deps_dict):
-                yield from units
-
-        for dep_name in ordered_units():
-            dep = self.all_deps[dep_name]
-            dep.run()
-        self.__pro__ = self.get_pro()
+        if self.state == '-':
+            self.prepare()
+        for dep in self:
+            dep.result = dep.main()
         self.result = self.main()
         return self.result
 
     # TODO!! detect cycles & invalid config
-
 
 
 class ContextAttribute:

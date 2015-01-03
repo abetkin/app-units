@@ -10,12 +10,10 @@ class Main(App):
 
 main = Main()
 
-units, deps_dict = main.traverse_deps()
+main.prepare()
 
 # case.assertEqual(len(units), 3)
-case.assertSequenceEqual(units, {a, b, c})
-
-print(deps_dict)
+case.assertSequenceEqual(main.deps, [a, b, c])
 
 ##
 
