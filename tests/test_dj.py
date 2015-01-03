@@ -23,4 +23,4 @@ class Params:
 
 app = AppUnit('main', [Serialize], [Params])
 app.run()
-print(app.all_deps[Serialize].result)
+print(app.deps[Serialize].result)
