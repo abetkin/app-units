@@ -16,6 +16,6 @@ app exec. on demand but track that not load an app twise
 
 ability to turn off auto-resolving deps
 
-if is not an app, do not run, just use
+ability to dynamically swap parents
 
-admin server: ipython notebook
+admin server: ipython notebook (probably an example for tornado server)

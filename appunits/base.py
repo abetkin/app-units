@@ -7,10 +7,11 @@ from .util.deps import sort_by_deps, breadth_first
 
 from .marks import CollectMarksMeta
 
+# TODO states: prepared, app1, app2, ...
+
 class AppUnit(metaclass=CollectMarksMeta):
     '''
     '''
-    # states: prepared, app1, app2, ...
     deps = set()
     parents = None
 
