@@ -33,7 +33,7 @@ class AppUnit(metaclass=CollectMarksMeta):
     def create_deps(self):
 
         for dep in self.deps:
-            if isinstance(dep, type):
+            if isinstance(dep, type) and issubclass(dep, AppUnit):
                 dep = dep()
             dep.parents.update(self.propagated_parents)
             yield dep
