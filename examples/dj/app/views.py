@@ -50,7 +50,7 @@ class ShowCats(AppAwareView):
     app_units = (Serialize,)
 
     def get(self, request):
-        obj = self.app.all_deps[Serialize].result
+        obj = self.app.deps[Serialize].result
         return JsonResponse(obj)
 
 show_cats = ShowCats.as_view()
