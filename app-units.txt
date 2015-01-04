@@ -18,4 +18,6 @@ ability to turn off auto-resolving deps
 
 ability to dynamically swap parents
 
-admin server: ipython notebook (probably an example for tornado server)
+admin client
+
+"test clients are going native"

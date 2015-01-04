@@ -36,6 +36,10 @@ def breadth_first(tree, children=iter):
             return
 
 
+def depth_first(tree, children=iter):
+    for node in children(tree):
+        yield from depth_first(node, children)
+    yield tree
 
 
 

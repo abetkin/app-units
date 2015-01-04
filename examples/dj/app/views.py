@@ -33,6 +33,7 @@ class AppAwareView(View):
     app_units = ()
     published_context = ('request_params',)
     propagate = True
+    # share_context = True
 
     @property
     def request_params(self):
