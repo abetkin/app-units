@@ -13,7 +13,7 @@ from appunits import AppUnit
 
 # TODO adapters
 class Params:
-    propagate = True
+    share_context = True
     published_context = ('request_params',)
 
     request_params = {

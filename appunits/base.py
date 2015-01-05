@@ -40,34 +40,18 @@ class AppUnit(metaclass=CollectMarksMeta):
         #                               "use dependencies because it's a set.")
         self.state = '-'
 
-    # def _instantiate_deps(self):
-    #     '''
-    #     '''
-    #     deps = tuple(self.deps.pop() for i in range(len(self.deps)))
-    #     for dep in deps:
-    #         if isinstance(dep, type) and issubclass(dep, AppUnit):
-    #             dep = dep()
-    #             # ! dep.prepare()
-    #         dep.parents.update(self.propagated_parents)
-    #         self.deps.add(dep)
-    #         yield dep
-            # TODO is not exhausted
-
-
     def _get_dependencies(self, registry):
         container = type(self.depends_on) # todo forbid iterator
-        # if container is tuple:
-        #     container = list
 
         def iterate():
             for dep in self.depends_on:
-                if dep.identity in registry:
-                    yield registry[dep.identity]
-                    continue
                 if isinstance(dep, type) and issubclass(dep, AppUnit):
                     dep = dep()
-                dep.Prepare(self)
-                yield dep
+                if dep.identity in registry:
+                    yield registry[dep.identity]
+                else:
+                    dep.Prepare(self)
+                    yield dep
 
         self.depends_on = container(iterate())
         yield from self.depends_on
@@ -103,28 +87,9 @@ class AppUnit(metaclass=CollectMarksMeta):
             else:
                 all_deps[dep.identity] = dep
 
-        # all_deps = {dep.identity: dep for dep in all_deps}
-
         deps_dict = {dep.identity: tuple(d.identity for d in dep.depends_on)
                      for dep in all_deps.values()}
 
-
-        # !! prepare parents here
-
-        # def units(self):
-        #     allowed = set()
-        #     for units_set in sort_by_deps(deps_dict):
-        #         allowed |= units_set
-        #         while units_order[0] in allowed:
-        #             unit = units_order.pop(0)
-        #             units_set.discard(unit)
-        #             yield unit
-        #         yield from units_set
-
-        # def get_deps(unit):
-        #     for dep in unit.depends_on:
-        #         dep =
-        #         for d in dep.deps:1
 
         class UnitsOrder:
             def __init__(self, unit):
@@ -155,7 +120,7 @@ class AppUnit(metaclass=CollectMarksMeta):
             unit.deps = sorted((all_deps[name] for name in unit.deps),
                                key=units.index)
             unit.deps = OrderedDict((d.identity, d) for d in unit.deps)
-            # unit.parents = [unit.deps[p] for p in unit.parents]
+            unit.parents = [unit.deps.get(p, p) for p in unit.parents]
             unit.__pro__ = unit.get_pro()
             unit.state = 'prepared'
 
