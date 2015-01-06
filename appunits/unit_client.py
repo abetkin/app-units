@@ -9,4 +9,4 @@ class ToUnits:
 
 class Serialize:1
 
-dispatch = ToUnits(Serialize, use_view=False)
+dispatch = ToUnits(Filter, Serialize)

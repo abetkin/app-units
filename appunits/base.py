@@ -1,3 +1,4 @@
+import inspect
 from functools import partial
 from collections import OrderedDict
 
@@ -22,7 +23,7 @@ class AppUnit(metaclass=CollectMarksMeta):
     '''
     '''
     depends_on = ()
-    parents = None # parents are identities, unless as_is(parent)
+    parents = None
 
     def __init__(self, identity=None, depends_on=None, parents=None):
         if identity is not None:
@@ -61,6 +62,8 @@ class AppUnit(metaclass=CollectMarksMeta):
     def depends_on(self):
     '''
 
+    autopilot = True
+
     def Prepare(self, master_unit):
         common_parents = (p for p in master_unit.parents
                           if p.share_context)
@@ -90,7 +93,6 @@ class AppUnit(metaclass=CollectMarksMeta):
         deps_dict = {dep.identity: tuple(d.identity for d in dep.depends_on)
                      for dep in all_deps.values()}
 
-
         class UnitsOrder:
             def __init__(self, unit):
                 self.unit = unit
@@ -115,7 +117,8 @@ class AppUnit(metaclass=CollectMarksMeta):
         for unit in units:
             # assert all(dep.state == 'prepared' for dep in unit.deps)
             deps_of_deps = {d.identity for dep in unit.depends_on
-                            for d in dep.deps.values()}
+                            for d in dep.deps.values()
+                            if dep.autopilot}
             unit.deps = deps_of_deps | {dep.identity for dep in unit.depends_on}
             unit.deps = sorted((all_deps[name] for name in unit.deps),
                                key=units.index)
@@ -128,10 +131,11 @@ class AppUnit(metaclass=CollectMarksMeta):
         return _mro(self.parents,
                     lambda obj: getattr(obj, '__pro__', ()))
 
-    def main(self):
-        '''
-        You should implement this.
-        '''
+    @classmethod
+    def make(cls, *args, **kwargs):
+        unit = cls(*args, **kwargs)
+        unit.prepare()
+        return unit
 
     def __repr__(self):
         return 'Unit %s' % repr(self.identity)
@@ -151,18 +155,19 @@ class AppUnit(metaclass=CollectMarksMeta):
     def __iter__(self):
         return iter(self.deps.values())
 
-
-    def run(self):
-        # if order is not defined manually:
-        if self.state == '-':
-            self.prepare()
+    def autorun(self, stop_after=None):
+        # define the start point
         for dep in self:
-            dep.result = dep.main()
-        #/ else ...
-        self.result = self.main()
-        return self.result
+            dep.result = dep.autorun()
+            if dep.identity == stop_after:
+                break
 
+    def run(self, stop_after=None):
+        '''Can be overriden'''
+        self.autorun(stop_after)
     # TODO!! detect cycles & invalid config
+
+    #App.make(*args)
 
 # TODO test!: units same deps
 
