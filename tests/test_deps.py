@@ -8,11 +8,8 @@ c = App('c', {a, b})
 class Main(App):
     depends_on = {a, c}
 
-main = Main()
+main = Main.make()
 
-main.prepare()
-
-# case.assertEqual(len(units), 3)
 case.assertSequenceEqual(list(main.deps.values()),
                          [a, b, c])
 

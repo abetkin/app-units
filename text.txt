@@ -1,0 +1,34 @@
+What is it:
+
+more than an ilustrated pattern what replacing inheritance with composition may look like. The frmwrk strives to provide some universal way to do it.
+
+not specific for web development but seeks its use ..
+declarative & not complex architecture but with commonplace needs like encapsulation. Yet it's not restrictive to web in any way.
+
+from not too long use of django + django-rest-framework
+
+put inheritance on the right level: app should be _composable_ from parts, and that parts ca be inherited.
+
+
+pattern: simple examples of ContextAttribute (patched) -> current impl
+
+
+
+
+
+- native client (pattern2: testable parts)
+
+    we have admin interface and miss developer interface
+
+    can have smth like admin interface for a view (url) (picture?)
+
+    iterate results for a request
+
+- pattern
+
+
+- autopilot for app
+
+
+++
+testing should not get harder if he have say, templates based app instead of api

@@ -21,6 +21,6 @@ class Params:
         'happy': True,
     }
 
-app = AppUnit('main', [Serialize], [Params])
-app.run()
+app = AppUnit.make('main', [Serialize], [Params])
+app.autorun()
 print(app.deps[Serialize].result)

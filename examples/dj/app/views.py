@@ -24,7 +24,7 @@ class Serialize(AppUnit):
         if srlzer.is_valid():
             return srlzer.data
 
-    def main(self):
+    def run(self):
         return self.get_object()
 
 
@@ -40,8 +40,8 @@ class AppAwareView(View):
 
 
     def dispatch(self, request, *args, **kwargs):
-        self.app = AppUnit('main', self.app_units, [self])
-        self.app.run()
+        self.app = AppUnit.make('main', self.app_units, [self])
+        self.app.autorun()
         return super(AppAwareView, self).dispatch(request, *args, **kwargs)
 
 
