@@ -3,31 +3,35 @@ from appunits.util import case
 
 class A(App):
 
-    def autorun(self):
+    def run(self):
         print('A')
 
 class B(App):
     depends_on = [A]
-    autopilot = False
+    # autorun_dependencies = False
 
     def run(self):
-        super().run(A)
+        print('B')
+        # self.autorun(A)
 
 
 class C(App):
-    depends_on = [A, B]
-    autopilot = False # rename: propagate_deps
+    depends_on = [B]
+    autorun_dependencies = False
 
-    def autorun(self):
+    def run(self):
         self.deps[B].run()
 
 
 class Main(App):
     depends_on = [C]
 
-main = Main.make()
 
-main.run()
+main = Main.make()
+print(list(main.deps.keys()))
+print('#####')
+
+main.autorun(C)
 
 
 # check STATE

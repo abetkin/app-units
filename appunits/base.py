@@ -1,6 +1,7 @@
 import inspect
 from functools import partial
 from collections import OrderedDict
+from itertools import chain
 
 
 from .util.mro import _mro
@@ -17,7 +18,13 @@ class UnitConfigError(Exception):
 # incapsulation!
 # option: ignore warnings
 
-#
+from enum import Enum
+
+class State(Enum):
+    CREATED = 0
+    PREPARED = 1
+    SUCCESS = 2
+    FAILED = 2
 
 class AppUnit(metaclass=CollectMarksMeta):
     '''
@@ -34,64 +41,65 @@ class AppUnit(metaclass=CollectMarksMeta):
             self.depends_on = depends_on
         if parents is not None:
             self.parents = parents
-        else:
-            self.parents = [] # TMP !
-        # if self.parents is None and isinstance(self.depends_on, set):
-        #         raise UnitConfigError("Unit parents are not specified. Can't "
-        #                               "use dependencies because it's a set.")
-        self.state = '-'
+        self.state = State.CREATED
 
-    def _get_dependencies(self, registry):
-        container = type(self.depends_on) # todo forbid iterator
+    # @property
+    # def depends_on(self):
 
-        def iterate():
-            for dep in self.depends_on:
-                if isinstance(dep, type) and issubclass(dep, AppUnit):
-                    dep = dep()
-                if dep.identity in registry:
-                    yield registry[dep.identity]
-                else:
-                    dep.Prepare(self)
-                    yield dep
+    autorun_dependencies = True
 
-        self.depends_on = container(iterate())
-        yield from self.depends_on
-
-    '''
-    @property
-    def depends_on(self):
-    '''
-
-    autopilot = True
-
-    def Prepare(self, master_unit):
+    def prepare_hook(self, master_unit):
         common_parents = (p for p in master_unit.parents
-                          if p.share_context)
+                          if getattr(p, 'share_context', False))
         self.parents.extend(common_parents)
 
     def prepare(self):
-        # TODO comments
+        # Get a non-ordered list of all units:
 
-        all_deps = {}
+        all_units = {}
         ignore = set()
+        created = set()
 
-        # Breadth-first iteration:
-        def get_deps(unit):
+        def instantiate_deps(unit):
+            # "get child nodes" function that will be applied to tree nodes
+            # in order to iterate it breadth-first.
             if unit.identity in ignore:
                 return
-            yield from unit._get_dependencies(all_deps)
+            container = type(unit.depends_on) # todo forbid iterator
+            def it():
+                for dep in unit.depends_on:
+                    if isinstance(dep, type) and issubclass(dep, AppUnit):
+                        dep = dep()
+                    if dep.identity in all_units:
+                        dep = all_units[dep.identity]
+                    created.add((dep, unit))
+                    yield dep
+            unit.depends_on = container(it())
+            yield from unit.depends_on
 
-        # rename: unit_by_name
-        iter_deps = breadth_first(self, get_deps)
+
+        iter_deps = breadth_first(self, instantiate_deps)
         next(iter_deps) # skip the root
         for dep in iter_deps:
-            if dep.identity in all_deps:
+            if dep.identity in all_units:
                 ignore.add(dep.identity)
             else:
-                all_deps[dep.identity] = dep
+                all_units[dep.identity] = dep
+
+        # Post-create actions:
+
+        for unit, _ in created | {(self, None)}:
+            if unit.parents is None:
+                unit.parents = list(unit.depends_on)
+            else:
+                unit.parents = [all_units.get(p, p) for p in unit.parents]
+        for unit, master_unit in created:
+            unit.prepare_hook(master_unit)
+
+        # Get an ordered list of all units:
 
         deps_dict = {dep.identity: tuple(d.identity for d in dep.depends_on)
-                     for dep in all_deps.values()}
+                     for dep in all_units.values()}
 
         class UnitsOrder:
             def __init__(self, unit):
@@ -99,7 +107,7 @@ class AppUnit(metaclass=CollectMarksMeta):
 
             def __lt__(self, other):
                 this = self.unit
-                for units in [u.depends_on for u in all_deps.values()]:
+                for units in [u.depends_on for u in all_units.values()]:
                     try:
                         units.index
                     except AttributeError:
@@ -112,20 +120,28 @@ class AppUnit(metaclass=CollectMarksMeta):
             for units_set in sort_by_deps(deps_dict):
                 yield from sorted(units_set, key=UnitsOrder)
 
-        units = [all_deps[name] for name in units()] + [self]
+        all_units = OrderedDict((name, all_units[name]) for name in units())
+        all_units[self.identity] = self
 
-        for unit in units:
-            # assert all(dep.state == 'prepared' for dep in unit.deps)
-            deps_of_deps = {d.identity for dep in unit.depends_on
-                            for d in dep.deps.values()
-                            if dep.autopilot}
-            unit.deps = deps_of_deps | {dep.identity for dep in unit.depends_on}
-            unit.deps = sorted((all_deps[name] for name in unit.deps),
-                               key=units.index)
-            unit.deps = OrderedDict((d.identity, d) for d in unit.deps)
-            unit.parents = [unit.deps.get(p, p) for p in unit.parents]
+        # Set every unit's dependencies:
+
+        for unit in all_units.values():
+            assert all(dep.state == State.PREPARED for dep in unit.depends_on)
+            unit.all_units = all_units
+            def deps_of_deps():
+                for u in unit.depends_on:
+                    for dep in u.deps.values():
+                        if not u.autorun_dependencies and dep in u.depends_on:
+                            continue
+                        yield dep.identity
+
+            unit.deps = set(deps_of_deps()) | {
+                    dep.identity for dep in unit.depends_on}
+            units_order = tuple(all_units.keys())
+            unit.deps = sorted(unit.deps, key=units_order.index)
+            unit.deps = OrderedDict((name, all_units[name]) for name in unit.deps)
             unit.__pro__ = unit.get_pro()
-            unit.state = 'prepared'
+            unit.state = State.PREPARED
 
     def get_pro(self):
         return _mro(self.parents,
@@ -152,22 +168,19 @@ class AppUnit(metaclass=CollectMarksMeta):
     # Recursion should happen only when traversing
     #
 
-    def __iter__(self):
-        return iter(self.deps.values())
-
     def autorun(self, stop_after=None):
-        # define the start point
-        for dep in self:
-            dep.result = dep.autorun()
-            if dep.identity == stop_after:
-                break
+        for dep in chain(self.deps.values(), [self]):
+            if stop_after:
+                all_units = tuple(self.all_units.keys())
+                if all_units.index(dep.identity) > all_units.index(stop_after):
+                    break
+            if dep.state == State.PREPARED:
+                dep.result = dep.run()
+                dep.state = State.SUCCESS
 
-    def run(self, stop_after=None):
+    def run(self):
         '''Can be overriden'''
-        self.autorun(stop_after)
     # TODO!! detect cycles & invalid config
-
-    #App.make(*args)
 
 # TODO test!: units same deps
 
