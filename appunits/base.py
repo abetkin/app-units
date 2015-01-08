@@ -168,21 +168,34 @@ class AppUnit(metaclass=CollectMarksMeta):
     # Recursion should happen only when traversing
     #
 
-    def autorun(self, stop_after=None):
-        for dep in chain(self.deps.values(), [self]):
+    def autorun(self, *args, stop_after=None, **kwargs):
+
+        def stop_before(unit):
             if stop_after:
                 all_units = tuple(self.all_units.keys())
-                if all_units.index(dep.identity) > all_units.index(stop_after):
-                    break
+                return (all_units.index(unit.identity) >
+                        all_units.index(stop_after))
+
+        for dep in self.deps.values():
+            if stop_before(dep):
+                return
             if dep.state == State.PREPARED:
                 dep.result = dep.run()
                 dep.state = State.SUCCESS
 
+        if stop_before(self):
+            return
+        if self.state == State.PREPARED:
+            self.result = self.run(*args, **kwargs)
+            self.state = State.SUCCESS
+        return self.result
+
     def run(self):
         '''Can be overriden'''
-    # TODO!! detect cycles & invalid config
 
-# TODO test!: units same deps
+
+    # TODO!! detect cycles & invalid config
+    # TODO test units with same deps
 
 class ContextAttribute:
     '''

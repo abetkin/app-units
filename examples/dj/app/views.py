@@ -8,6 +8,8 @@ from django.http import HttpResponse, JsonResponse
 from rest_framework import generics, serializers
 
 from appunits import AppUnit, ContextAttribute
+from appunits.dj import ViewUnit
+from .models import Cat
 
 class Filter(AppUnit):
     1
@@ -43,6 +45,32 @@ class AppAwareView(View):
         self.app = AppUnit.make('main', self.app_units, [self])
         self.app.autorun()
         return super(AppAwareView, self).dispatch(request, *args, **kwargs)
+
+
+class ViewCats(ViewUnit):
+
+    published_context = ('request_params',)
+    share_context = True
+
+    @property
+    def request_params(self):
+        return self.request.GET
+
+    @property
+    def depends_on(self):
+        return getattr(self, '_depends_on', None) or [
+            Serialize(parents=[self])
+        ]
+
+    @depends_on.setter
+    def depends_on(self, value):
+        self._depends_on = value
+
+    def run(self, request):
+        obj = self.deps[Serialize].result
+        return JsonResponse(obj)
+
+view_cats = ViewCats.as_view()
 
 
 class ShowCats(AppAwareView):
