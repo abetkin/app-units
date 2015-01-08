@@ -58,13 +58,7 @@ class ViewCats(ViewUnit):
 
     @property
     def depends_on(self):
-        return getattr(self, '_depends_on', None) or [
-            Serialize(parents=[self])
-        ]
-
-    @depends_on.setter
-    def depends_on(self, value):
-        self._depends_on = value
+        return [Serialize(parents=[self])]
 
     def run(self, request):
         obj = self.deps[Serialize].result

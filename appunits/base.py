@@ -74,8 +74,8 @@ class AppUnit(metaclass=CollectMarksMeta):
                         dep = all_units[dep.identity]
                     created.add((dep, unit))
                     yield dep
-            unit.depends_on = container(it())
-            yield from unit.depends_on
+            unit.dependencies = container(it())
+            yield from unit.dependencies
 
 
         iter_deps = breadth_first(self, instantiate_deps)
@@ -90,7 +90,7 @@ class AppUnit(metaclass=CollectMarksMeta):
 
         for unit, _ in created | {(self, None)}:
             if unit.parents is None:
-                unit.parents = list(unit.depends_on)
+                unit.parents = list(unit.dependencies)
             else:
                 unit.parents = [all_units.get(p, p) for p in unit.parents]
         for unit, master_unit in created:
@@ -98,7 +98,7 @@ class AppUnit(metaclass=CollectMarksMeta):
 
         # Get an ordered list of all units:
 
-        deps_dict = {dep.identity: tuple(d.identity for d in dep.depends_on)
+        deps_dict = {dep.identity: tuple(d.identity for d in dep.dependencies)
                      for dep in all_units.values()}
 
         class UnitsOrder:
@@ -107,7 +107,7 @@ class AppUnit(metaclass=CollectMarksMeta):
 
             def __lt__(self, other):
                 this = self.unit
-                for units in [u.depends_on for u in all_units.values()]:
+                for units in [u.dependencies for u in all_units.values()]:
                     try:
                         units.index
                     except AttributeError:
@@ -126,17 +126,17 @@ class AppUnit(metaclass=CollectMarksMeta):
         # Set every unit's dependencies:
 
         for unit in all_units.values():
-            assert all(dep.state == State.PREPARED for dep in unit.depends_on)
+            assert all(dep.state == State.PREPARED for dep in unit.dependencies)
             unit.all_units = all_units
             def deps_of_deps():
-                for u in unit.depends_on:
+                for u in unit.dependencies:
                     for dep in u.deps.values():
-                        if not u.autorun_dependencies and dep in u.depends_on:
+                        if not u.autorun_dependencies and dep in u.dependencies:
                             continue
                         yield dep.identity
 
             unit.deps = set(deps_of_deps()) | {
-                    dep.identity for dep in unit.depends_on}
+                    dep.identity for dep in unit.dependencies}
             units_order = tuple(all_units.keys())
             unit.deps = sorted(unit.deps, key=units_order.index)
             unit.deps = OrderedDict((name, all_units[name]) for name in unit.deps)
