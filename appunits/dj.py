@@ -1,4 +1,5 @@
 from functools import update_wrapper
+import types
 
 from .base import AppUnit
 
@@ -19,6 +20,8 @@ class UnitResponse:
 
 class ViewUnit(AppUnit):
 
+    view = None
+
     publish_attrs = ['request']
 
     @classmethod
@@ -33,30 +36,29 @@ class ViewUnit(AppUnit):
         # take name and docstring from class
         update_wrapper(view, cls, updated=())
         # and possible attributes from run
-        update_wrapper(view, cls.run, assigned=())
+        update_wrapper(view, cls.view, assigned=())
         return view
 
+    def __get__(self, instance, owner):
+        if instance is None:
+            return self
+        dispatch = getattr(self, '_decorated_func', None) \
+                or super(owner, instance).dispatch
+        def view(request, *args, **kwargs):
+            self.request = request = request
+            self.prepare()
+            self.autorun(request, *args, **kwargs)
+            return dispatch(request, *args, **kwargs)
 
-# class A:
+        update_wrapper(view, owner, updated=())
+        update_wrapper(view, dispatch, assigned=())
+        return view
 
-#     def aa(self):
-#         return self
+    def __call__(self, f):
+        self._decorated_func = f
+        return self
 
-
-# class Method:
-
-#     def __get__(self, inst, owner):
-
-#         def f():
-#             return 3
-#         return f
-
-
-# class B(A):
-
-#     def unit_conf(self):
-#         1
-
-#     @UnitDispatch(unit_conf) # kw or callable
-#     def dispatch(self, r):
-#         1
+    def run(self, request, *args, **kwargs):
+        if not self.view:
+            raise NotImplementedError('No "view" callable in %s' % self)
+        return self.view(request, *args, **kwargs)

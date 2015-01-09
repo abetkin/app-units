@@ -73,6 +73,21 @@ class ViewCats(ViewUnit):
 
 view_cats = ViewCats.as_view()
 
+class Viu(View):
+
+    # @property
+    # def depends_on(self):
+    #     return [
+    #         Serialize(context_objects=[{'data': self.request.GET}]),
+    #     ]
+    dispatch = ViewCats()
+
+    def get(self, request):
+        obj = Viu.dispatch.deps[CatSerializer].result
+        return JsonResponse(obj)
+
+viu = Viu.as_view()
+
 
 class ShowCats(AppAwareView):
 
