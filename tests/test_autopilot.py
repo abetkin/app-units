@@ -20,18 +20,21 @@ class C(App):
     autorun_dependencies = False
 
     def run(self):
-        self.deps[B].run()
+        self.all_units[B].run()
 
 
 class Main(App):
     depends_on = [C]
+
+    def run(self, s):
+        print('Main: %s' % s)
 
 
 main = Main.make()
 print(list(main.deps.keys()))
 print('#####')
 
-main.autorun(C)
+main.autorun('fef')
 
 
 # check STATE

@@ -15,7 +15,7 @@ class Filter(AppUnit):
     1
 
 class Serialize(AppUnit):
-    data = ContextAttribute('request_params')
+    data = ContextAttribute('data') # !! 'request.GET')
 
     class _Serializer(serializers.Serializer):
         name = serializers.CharField()
@@ -47,18 +47,20 @@ class AppAwareView(View):
         return super(AppAwareView, self).dispatch(request, *args, **kwargs)
 
 
+class mydict(dict):
+
+    def __init__(self, *args, **kw):
+        super().__init__(*args, **kw)
+        self.published_context_extra = self
+
+
 class ViewCats(ViewUnit):
-
-    published_context = ('request_params',)
-    share_context = True
-
-    @property
-    def request_params(self):
-        return self.request.GET
 
     @property
     def depends_on(self):
-        return [Serialize(parents=[self])]
+        return [
+            Serialize(context_objects=[mydict({'data': self.request.GET})]),
+        ]
 
     def run(self, request):
         obj = self.deps[Serialize].result

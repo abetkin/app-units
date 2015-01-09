@@ -1,7 +1,7 @@
 import inspect
 from functools import partial
 from collections import OrderedDict
-from itertools import chain
+import itertools
 
 
 from .util.mro import _mro
@@ -12,6 +12,8 @@ from .marks import CollectMarksMeta
 class UnitConfigError(Exception):
     pass
 
+class ProChainError(Exception):
+    pass
 
 # TODO states: prepared, app1, app2, ...
 # TODO ability to specify order manually!!
@@ -30,76 +32,57 @@ class AppUnit(metaclass=CollectMarksMeta):
     '''
     '''
     depends_on = ()
-    parents = None
+    context_objects = ()
 
-    def __init__(self, identity=None, depends_on=None, parents=None):
+    def __init__(self, identity=None, depends_on=None, context_objects=None):
         if identity is not None:
             self.identity = identity
         else:
             self.identity = self.__class__
         if depends_on is not None:
             self.depends_on = depends_on
-        if parents is not None:
-            self.parents = parents
+        # elif not hasattr(self, 'depends_on'):
+        #     self.depends_on = []
+        if context_objects is not None:
+            self.context_objects = context_objects
+        # elif not hasattr(self, 'context_objects'):
+        #     self.context_objects = []
         self.state = State.CREATED
-
-    # @property
-    # def depends_on(self):
 
     autorun_dependencies = True
 
-    def prepare_hook(self, master_unit):
-        common_parents = (p for p in master_unit.parents
-                          if getattr(p, 'share_context', False))
-        self.parents.extend(common_parents)
+    def prepare_hook(self, parents):
+        '''
+        A hook that can be used, for example,
+        for sharing some of the parent's context with the child.
+        '''
+        self.context_objects = list(self.context_objects)
+        self.context_objects.extend(parents.values())
 
     def prepare(self):
-        # Get a non-ordered list of all units:
+        ## Get a non-ordered list of all units ##
 
-        all_units = {}
-        ignore = set()
-        created = set()
+        all_units = {} # key = value
+        parents = {}
 
         def instantiate_deps(unit):
-            # "get child nodes" function that will be applied to tree nodes
-            # in order to iterate it breadth-first.
-            if unit.identity in ignore:
-                return
             container = type(unit.depends_on) # todo forbid iterator
             def it():
                 for dep in unit.depends_on:
                     if isinstance(dep, type) and issubclass(dep, AppUnit):
                         dep = dep()
-                    if dep.identity in all_units:
-                        dep = all_units[dep.identity]
-                    created.add((dep, unit))
+                    if dep in all_units:
+                        dep = all_units[dep]
+                    parents.setdefault(dep, []).append(unit)
                     yield dep
-            unit.dependencies = container(it())
-            yield from unit.dependencies
+            unit.deps = container(it())
+            yield from unit.deps
 
+        list(breadth_first(self, instantiate_deps, all_units))
 
-        iter_deps = breadth_first(self, instantiate_deps)
-        next(iter_deps) # skip the root
-        for dep in iter_deps:
-            if dep.identity in all_units:
-                ignore.add(dep.identity)
-            else:
-                all_units[dep.identity] = dep
+        ## Get an ordered list of all units ##
 
-        # Post-create actions:
-
-        for unit, _ in created | {(self, None)}:
-            if unit.parents is None:
-                unit.parents = list(unit.dependencies)
-            else:
-                unit.parents = [all_units.get(p, p) for p in unit.parents]
-        for unit, master_unit in created:
-            unit.prepare_hook(master_unit)
-
-        # Get an ordered list of all units:
-
-        deps_dict = {dep.identity: tuple(d.identity for d in dep.dependencies)
-                     for dep in all_units.values()}
+        deps_dict = {unit: unit.deps for unit in all_units}
 
         class UnitsOrder:
             def __init__(self, unit):
@@ -107,7 +90,7 @@ class AppUnit(metaclass=CollectMarksMeta):
 
             def __lt__(self, other):
                 this = self.unit
-                for units in [u.dependencies for u in all_units.values()]:
+                for units in [u.deps for u in all_units]:
                     try:
                         units.index
                     except AttributeError:
@@ -120,32 +103,48 @@ class AppUnit(metaclass=CollectMarksMeta):
             for units_set in sort_by_deps(deps_dict):
                 yield from sorted(units_set, key=UnitsOrder)
 
-        all_units = OrderedDict((name, all_units[name]) for name in units())
-        all_units[self.identity] = self
+        all_units = list(units())
+        # providing a nicer interface
+        all_units_dict = OrderedDict((u.identity, u) for u in all_units)
 
-        # Set every unit's dependencies:
+        ## Set all units' dependencies ##
 
-        for unit in all_units.values():
-            assert all(dep.state == State.PREPARED for dep in unit.dependencies)
-            unit.all_units = all_units
-            def deps_of_deps():
-                for u in unit.dependencies:
-                    for dep in u.deps.values():
-                        if not u.autorun_dependencies and dep in u.dependencies:
-                            continue
-                        yield dep.identity
+        for unit in all_units:
+            unit.all_units = all_units_dict
+            unit_deps = set(unit.deps) if unit.autorun_dependencies else set()
+            for dep in unit.deps:
+                unit_deps |= set(dep.deps)
+            unit.deps = sorted(unit_deps, key=all_units.index)
 
-            unit.deps = set(deps_of_deps()) | {
-                    dep.identity for dep in unit.dependencies}
-            units_order = tuple(all_units.keys())
-            unit.deps = sorted(unit.deps, key=units_order.index)
-            unit.deps = OrderedDict((name, all_units[name]) for name in unit.deps)
-            unit.__pro__ = unit.get_pro()
+        # providing a nicer interface
+        for unit in all_units:
+            unit.deps = OrderedDict((u.identity, u) for u in unit.deps)
+
+        ## Set the context objects ##
+
+        for unit, parents in itertools.chain(parents.items(),
+                                             [(self, [])]):
+            parents = OrderedDict((u.identity, u) for u in parents)
+            unit.prepare_hook(parents)
+            unit.get_pro()
             unit.state = State.PREPARED
 
-    def get_pro(self):
-        return _mro(self.parents,
-                    lambda obj: getattr(obj, '__pro__', ()))
+        assert all(unit.state == State.PREPARED for unit in all_units)
+
+
+    def get_pro(obj, chain=None):
+        if not getattr(obj, 'context_objects', ()):
+            return ()
+        if not hasattr(obj, '__pro__'):
+            if chain is None:
+                chain = []
+            elif obj in chain:
+                raise ProChainError(chain + [obj])
+            else:
+                chain.append(obj)
+            obj.__pro__ = _mro(obj.context_objects,
+                               partial(AppUnit.get_pro, chain=chain))
+        return obj.__pro__
 
     @classmethod
     def make(cls, *args, **kwargs):
@@ -204,9 +203,6 @@ class ContextAttribute:
     "__pro__" stays for "parent resolution order".
     '''
 
-    PUBLISHED_CONTEXT_ATTR = 'published_context'
-    PUBLISHED_CONTEXT_EXTRA_ATTR = 'published_context_extra'
-
     def __init__(self, name):
         self.name = name
 
@@ -217,11 +213,17 @@ class ContextAttribute:
 
     def _lookup(self, instance):
         for obj in instance.__pro__:
-            published_context = getattr(obj, self.PUBLISHED_CONTEXT_ATTR, ())
+            published_context = getattr(obj, 'published_context', ())
             if self.name in published_context:
                return getattr(obj, self.name)
             published_context_extra = getattr(obj,
-                    self.PUBLISHED_CONTEXT_EXTRA_ATTR, ()) # normally a dict
+                    'published_context_extra', ()) # normally a dict
             if self.name in published_context_extra:
                return obj.published_context_extra[self.name]
         raise AttributeError(self.name)
+
+
+
+# published_context = ('request', 'view') : inheritance ?
+
+# TODO: dot access attr.attr2

@@ -19,14 +19,14 @@ class UnitResponse:
 
 class ViewUnit(AppUnit):
 
+    published_context = ['request']
+
     @classmethod
     def as_view(cls, *unit_args, **unit_kwargs):
 
         def view(request, *args, **kwargs):
             view_unit = cls(*unit_args, **unit_kwargs)
             view_unit.request = request
-            view_unit.args = args
-            view_unit.kwargs = kwargs
             view_unit.prepare()
             return view_unit.autorun(request, *args, **kwargs)
 

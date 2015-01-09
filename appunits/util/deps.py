@@ -20,17 +20,23 @@ def sort_by_deps(deps_dict):
     return r
 
 
-# http://code.activestate.com/recipes/231503-breadth-first-traversal-of-tree/
-def breadth_first(tree, children=iter):
-    yield tree
-    last = tree
-    for node in breadth_first(tree, children):
+def breadth_first(root, children=iter, all_nodes=None):
+    if all_nodes is None:
+        all_nodes = {} # sorry it's not a set
+    queue = []
+
+    if root not in all_nodes:
+        all_nodes[root] = root
+        queue.append(root)
+
+    while queue:
+        node = queue.pop(0)
+        yield node
+
         for child in children(node):
-            yield child
-            last = child
-        if last == node:
-            return
-    # ? children gen is not exhausted
+            if child not in all_nodes:
+                all_nodes[child] = child
+                queue.append(child)
 
 
 def depth_first(tree, children=iter):
