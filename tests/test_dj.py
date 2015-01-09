@@ -13,8 +13,7 @@ from appunits import AppUnit
 
 # TODO adapters
 class Params:
-    share_context = True
-    published_context = ('request_params',)
+    publish_attrs = ('request_params',)
 
     request_params = {
         'name': 'gav',

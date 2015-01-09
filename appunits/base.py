@@ -3,9 +3,9 @@ from functools import partial
 from collections import OrderedDict
 import itertools
 
-
+from .util import get_attribute
 from .util.mro import _mro
-from .util.deps import sort_by_deps, breadth_first, depth_first
+from .util.deps import sort_by_deps, breadth_first
 
 from .marks import CollectMarksMeta
 
@@ -204,26 +204,32 @@ class ContextAttribute:
     '''
 
     def __init__(self, name):
-        self.name = name
+        self.name, *self.rest_of_path = name.split('.')
 
     def __get__(self, instance, owner):
         if instance:
-            return self._lookup(instance)
+            obj = self._lookup(instance)
+            return get_attribute(obj, self.rest_of_path)
         return self
 
     def _lookup(self, instance):
         for obj in instance.__pro__:
-            published_context = getattr(obj, 'published_context', ())
-            if self.name in published_context:
+            publish_attrs = getattr(obj, 'publish_attrs', ())
+            if self.name in publish_attrs:
                return getattr(obj, self.name)
-            published_context_extra = getattr(obj,
-                    'published_context_extra', ()) # normally a dict
-            if self.name in published_context_extra:
-               return obj.published_context_extra[self.name]
+            if isinstance(obj, dict):
+                lookup = obj.__getitem__
+            else:
+                lookup = getattr(obj, '__lookup__',
+                        lambda name: obj.__lookupdict__[name])
+            try:
+                return lookup(self.name)
+            except (AttributeError, KeyError):
+                continue
         raise AttributeError(self.name)
 
 
 
-# published_context = ('request', 'view') : inheritance ?
+# publish_attrs = ('request', 'view') : inheritance ?
 
 # TODO: dot access attr.attr2

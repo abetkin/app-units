@@ -19,7 +19,7 @@ class UnitResponse:
 
 class ViewUnit(AppUnit):
 
-    published_context = ['request']
+    publish_attrs = ['request']
 
     @classmethod
     def as_view(cls, *unit_args, **unit_kwargs):

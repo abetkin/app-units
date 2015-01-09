@@ -1,12 +1,11 @@
 from copy import copy
 from collections import OrderedDict
 from abc import ABCMeta
+from functools import partial
 
 from .util import common_superclass
 
 class Mark(metaclass=ABCMeta):
-
-    COLLECT_INTO = '_marks'
 
     def __init__(self, **kwargs):
         self.source_function = None
@@ -23,9 +22,10 @@ class Mark(metaclass=ABCMeta):
         return self
 
     @classmethod
-    def build_all(cls, marks_dict, klass):
+    def build_all(cls, marks_dict, klass, build=None):
         for key, m in marks_dict.items():
-            marks_dict[key] = m.build(klass)
+            build = build or m.__class__.build
+            marks_dict[key] = build(m, klass)
         return marks_dict
 
     @classmethod
@@ -33,8 +33,15 @@ class Mark(metaclass=ABCMeta):
         if not marks_dict:
             return
         supercls = common_superclass(marks_dict.values())
-        built_dict = supercls.build_all(marks_dict, klass)
-        setattr(klass, supercls.COLLECT_INTO, built_dict)
+        if Mark in supercls.__mro__:
+            build_all = supercls.build_all
+        else:
+            # was registered via abc
+            build_all = partial(Mark.build_all, build=Mark.build)
+        built_dict = build_all(marks_dict, klass)
+        collect_into = getattr(supercls, 'COLLECT_INTO', None) \
+                or getattr(klass, 'COLLECT_INTO', None) or '_marks'
+        setattr(klass, collect_into, built_dict)
 
 
 class CollectMarksMeta(type):
