@@ -42,10 +42,11 @@ class ViewUnit(AppUnit):
     def __get__(self, instance, owner):
         if instance is None:
             return self
-        dispatch = getattr(self, '_decorated_func', None) \
-                or super(owner, instance).dispatch
+        decorated = getattr(self, '_decorated_func', None)
+        dispatch = decorated.__get__(instance) if decorated \
+                else super(owner, instance).dispatch
         def view(request, *args, **kwargs):
-            self.request = request = request
+            self.request = request
             self.prepare()
             self.autorun(request, *args, **kwargs)
             return dispatch(request, *args, **kwargs)

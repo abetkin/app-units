@@ -80,11 +80,11 @@ class Viu(View):
     #     return [
     #         Serialize(context_objects=[{'data': self.request.GET}]),
     #     ]
-    dispatch = ViewCats()
-
-    def get(self, request):
+    @ViewCats()
+    def dispatch(self, request):
         obj = Viu.dispatch.deps[CatSerializer].result
         return JsonResponse(obj)
+
 
 viu = Viu.as_view()
 
