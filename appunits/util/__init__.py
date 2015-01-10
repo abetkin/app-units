@@ -21,8 +21,7 @@ def common_superclass(objects):
             supercls = supercls.__mro__[1]
     return supercls
 
-# based on https://github.com/tomchristie/django-rest-framework/
-# blob/4d9e7a53565f6301b87999e6bafdb1c2c3c2af3b/rest_framework/fields.py#L54
+# copied almost entirely from rest_framework.fields.get_attribute
 def get_attribute(instance, attrs):
     """
     Similar to Python's built in `getattr(instance, attr)`,

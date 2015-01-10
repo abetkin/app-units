@@ -22,6 +22,7 @@ class ProChainError(Exception):
 
 from enum import Enum
 
+# TODO remove ?
 class State(Enum):
     CREATED = 0
     PREPARED = 1
@@ -51,6 +52,7 @@ class AppUnit(metaclass=CollectMarksMeta):
 
     autorun_dependencies = True
 
+    # -> prepare_unit ?
     def prepare_hook(self, parents):
         '''
         A hook that can be used, for example,
@@ -59,7 +61,14 @@ class AppUnit(metaclass=CollectMarksMeta):
         self.context_objects = list(self.context_objects)
         self.context_objects.extend(parents.values())
 
-    def prepare(self):
+    def prepare_run(self, *args, **kwargs):
+        self.run_args = getattr(self, 'run_args', args)
+        self.run_kwargs = getattr(self, 'run_kwargs', kwargs)
+
+    # -> _prepare_run ?
+    def prepare(self, *run_args, **run_kwargs):
+        self.prepare_run(*run_args, **run_kwargs)
+
         ## Get a non-ordered list of all units ##
 
         all_units = {} # key = value
@@ -130,7 +139,7 @@ class AppUnit(metaclass=CollectMarksMeta):
             unit.state = State.PREPARED
 
         assert all(unit.state == State.PREPARED for unit in all_units)
-
+        self.prepared = True
 
     def get_pro(obj, chain=None):
         if not getattr(obj, 'context_objects', ()):
@@ -146,11 +155,13 @@ class AppUnit(metaclass=CollectMarksMeta):
                                partial(AppUnit.get_pro, chain=chain))
         return obj.__pro__
 
-    @classmethod
-    def make(cls, *args, **kwargs):
-        unit = cls(*args, **kwargs)
-        unit.prepare()
-        return unit
+    # FIXME prepare_run
+
+    # @classmethod
+    # def make(cls, *args, **kwargs):
+    #     unit = cls(*args, **kwargs)
+    #     unit.prepare()
+    #     return unit
 
     def __repr__(self):
         return 'Unit %s' % repr(self.identity)
@@ -167,13 +178,21 @@ class AppUnit(metaclass=CollectMarksMeta):
     # Recursion should happen only when traversing
     #
 
+    # TODO: autorun -> run, run -> main
+
     def autorun(self, *args, stop_after=None, **kwargs):
+        if not getattr(self, 'prepared', None):
+            self.prepare(*args, **kwargs)
 
         def stop_before(unit):
-            if stop_after:
-                all_units = tuple(self.all_units.keys())
-                return (all_units.index(unit.identity) >
-                        all_units.index(stop_after))
+            if stop_after is None:
+                return
+            all_units = tuple(self.all_units.keys())
+            if isinstance(stop_after, int):
+                return all_units.index(unit.identity) > stop_after
+
+            return (all_units.index(unit.identity) >
+                    all_units.index(stop_after))
 
         for dep in self.deps.values():
             if stop_before(dep):
@@ -185,7 +204,7 @@ class AppUnit(metaclass=CollectMarksMeta):
         if stop_before(self):
             return
         if self.state == State.PREPARED:
-            self.result = self.run(*args, **kwargs)
+            self.result = self.run()
             self.state = State.SUCCESS
         return self.result
 

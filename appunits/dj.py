@@ -1,22 +1,53 @@
-from functools import update_wrapper, wraps
+from functools import update_wrapper, wraps, partial
 import types
 
 from .base import AppUnit
 
 from django import test
+from django.http import HttpResponse
 
 class UnitClient(test.Client):
 
     def generic(self, method, path, **kw):
+        stop_after = kw.pop('unit', None)
+        repeat = partial(self.generic, method=method, path=path, **kw)
+        kw.update({'units.stop_after': stop_after})
         response = super().generic(method, path, **kw)
-        return UnitResponse(response)
+        return UnitsIterator(response._unit, repeat, stop_after)
 
 
-class UnitResponse:
+class UnitsIterator:
 
-    def __init__(self, http_resp):
-        self.main_unit = http_resp._unit
+    def __init__(self, unit, repeat, current_unit):
+        self.unit = unit
+        self.repeat = repeat
+        self.current_unit = self[current_unit]
 
+    def go(self, unit):
+        all_units = tuple(self.unit.all_units.keys())
+        if not isinstance(unit, int):
+            unit = all_units.index(unit)
+        if all_units.index(self.identity) > unit:
+            return self.repeat(unit=unit)
+        self.unit.autorun(stop_after=unit)
+        self.current_unit = self[unit]
+        return self
+
+    def __getattr__(self, name):
+        return getattr(self.current_unit, name)
+
+    # def _repr_pretty_
+
+    def __getitem__(self, unit):
+        if unit is None:
+            return self.unit
+        if isinstance(unit, int):
+            return tuple(self.unit.all_units.values())[unit]
+        return self.unit.all_units[unit]
+
+
+class UnitResponse(HttpResponse):
+    pass
 
 class ViewUnit(AppUnit):
 
@@ -24,14 +55,26 @@ class ViewUnit(AppUnit):
 
     publish_attrs = ['request']
 
+    def prepare_run(self, request, *args, **kwargs):
+        self.request = request
+        self.view_args = args
+        self.view_kwargs = kwargs
+
     def as_view(self):
         if not self.view:
             raise NotImplementedError('No "view" callable in %s' % self)
 
         def view(request, *args, **kwargs):
-            self.request = request
-            self.prepare()
-            return self.autorun(request, *args, **kwargs)
+            is_test_client = 'units.stop_after' in request.META
+            if is_test_client:
+                kwargs.update(stop_after=request.META['units.stop_after'])
+            self.autorun(request, *args, **kwargs)
+            if is_test_client:
+                # HttpResponse hasn't been got yet
+                empty = UnitResponse()
+                empty._unit = self
+                return empty
+            return self.result
 
         # take name and docstring from class
         update_wrapper(view, self.__class__, updated=())
@@ -52,5 +95,5 @@ class ViewUnit(AppUnit):
         self._decorated_func = f
         return self
 
-    def run(self, request, *args, **kwargs):
-        return self.view(request, *args, **kwargs)
+    def run(self):
+        return self.view(self.request, *self.view_args, **self.view_kwargs)
