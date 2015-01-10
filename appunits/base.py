@@ -20,15 +20,6 @@ class ProChainError(Exception):
 # incapsulation!
 # option: ignore warnings
 
-from enum import Enum
-
-# TODO remove ?
-class State(Enum):
-    CREATED = 0
-    PREPARED = 1
-    SUCCESS = 2
-    FAILED = 2
-
 class AppUnit(metaclass=CollectMarksMeta):
     '''
     '''
@@ -48,7 +39,6 @@ class AppUnit(metaclass=CollectMarksMeta):
             self.context_objects = context_objects
         # elif not hasattr(self, 'context_objects'):
         #     self.context_objects = []
-        self.state = State.CREATED
 
     autorun_dependencies = True
 
@@ -66,7 +56,10 @@ class AppUnit(metaclass=CollectMarksMeta):
         self.run_kwargs = getattr(self, 'run_kwargs', kwargs)
 
     # -> _prepare_run ?
+    # all_units - list interface?
     def prepare(self, *run_args, **run_kwargs):
+        '''TODO what it does? self.all_units ?
+        '''
         self.prepare_run(*run_args, **run_kwargs)
 
         ## Get a non-ordered list of all units ##
@@ -136,10 +129,6 @@ class AppUnit(metaclass=CollectMarksMeta):
             parents = OrderedDict((u.identity, u) for u in parents)
             unit.prepare_hook(parents)
             unit.get_pro()
-            unit.state = State.PREPARED
-
-        assert all(unit.state == State.PREPARED for unit in all_units)
-        self.prepared = True
 
     def get_pro(obj, chain=None):
         if not getattr(obj, 'context_objects', ()):
@@ -154,8 +143,6 @@ class AppUnit(metaclass=CollectMarksMeta):
             obj.__pro__ = _mro(obj.context_objects,
                                partial(AppUnit.get_pro, chain=chain))
         return obj.__pro__
-
-    # FIXME prepare_run
 
     # @classmethod
     # def make(cls, *args, **kwargs):
@@ -175,37 +162,36 @@ class AppUnit(metaclass=CollectMarksMeta):
         if isinstance(other, AppUnit):
             return self.identity == other.identity
 
+    def _iter_units(self):
+        yield from self.deps.values()
+        yield self
+
+
     # Recursion should happen only when traversing
     #
 
     # TODO: autorun -> run, run -> main
 
     def autorun(self, *args, stop_after=None, **kwargs):
-        if not getattr(self, 'prepared', None):
+        # FIXME JUST ITERATOR
+        if not getattr(self, 'run_session', None):
             self.prepare(*args, **kwargs)
+            self.run_session = self._iter_units()
 
-        def stop_before(unit):
+        def stop_here(unit):
             if stop_after is None:
                 return
             all_units = tuple(self.all_units.keys())
             if isinstance(stop_after, int):
                 return all_units.index(unit.identity) > stop_after
-
             return (all_units.index(unit.identity) >
                     all_units.index(stop_after))
 
-        for dep in self.deps.values():
-            if stop_before(dep):
-                return
-            if dep.state == State.PREPARED:
-                dep.result = dep.run()
-                dep.state = State.SUCCESS
+        for unit in self.run_session:
+            if stop_here(unit):
+                return unit.result
+            unit.result = unit.run()
 
-        if stop_before(self):
-            return
-        if self.state == State.PREPARED:
-            self.result = self.run()
-            self.state = State.SUCCESS
         return self.result
 
     def run(self):

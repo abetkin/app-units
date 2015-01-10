@@ -36,7 +36,23 @@ class UnitsIterator:
     def __getattr__(self, name):
         return getattr(self.current_unit, name)
 
-    # def _repr_pretty_
+    def _repr_pretty_(self, p, cycle):
+        from IPython.lib import pretty
+        if cycle:
+            p.text('UnitsIterator(..)')
+            return
+        p.text('Application units:')
+        # all_units = tuple()
+        # with p.group(2):
+        #     self.all_units.index
+        #     p.text(self.wrapped_func.__name__) #(a=1,b=..)
+        #     p.text(' returned')
+        #     p.breakable()
+        #     p.text( pretty(self.rv))
+
+    # full info:
+    # N# app:\n result
+    # To run:\n ..
 
     def __getitem__(self, unit):
         if unit is None:
