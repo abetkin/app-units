@@ -67,11 +67,11 @@ class ViewCats(ViewUnit):
     #     ]
     depends_on = [CatSerializer]
 
-    def run(self, request):
+    def view(self, request):
         obj = self.deps[CatSerializer].result
         return JsonResponse(obj)
 
-view_cats = ViewCats.as_view()
+view_cats = ViewCats().as_view()
 
 class Viu(View):
 
