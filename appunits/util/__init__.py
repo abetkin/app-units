@@ -11,16 +11,6 @@ class Case(unittest.TestCase):
 
 case = Case('runTest')
 
-def common_superclass(objects):
-    supercls = None
-    for obj in objects:
-        if not supercls:
-            supercls = type(obj)
-            continue
-        while not isinstance(obj, supercls):
-            supercls = supercls.__mro__[1]
-    return supercls
-
 # copied almost entirely from rest_framework.fields.get_attribute
 def get_attribute(instance, attrs):
     """

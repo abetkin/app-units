@@ -1,9 +1,6 @@
 from copy import copy
 from collections import OrderedDict
 from abc import ABCMeta
-from functools import partial
-
-from .util import common_superclass
 
 class Mark(metaclass=ABCMeta):
 
@@ -30,7 +27,13 @@ class Mark(metaclass=ABCMeta):
                 built_mark = mark.build_mark(klass)
             except AttributeError:
                 built_mark = mark
-            collect_into = getattr(mark, 'collect_into', Mark.collect_into)
+            # check if klass defines .collect_marks_into
+            if hasattr(klass, 'collect_marks_into'):
+                collect_into = klass.collect_marks_into
+                if not isinstance(collect_into, str):
+                    collect_into = collect_into(mark)
+            else:
+                collect_into = getattr(mark, 'collect_into', Mark.collect_into)
             if not collect_into in klass.__dict__:
                 setattr(klass, collect_into, OrderedDict([(key, built_mark)]))
             else:
