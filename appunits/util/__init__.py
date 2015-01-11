@@ -40,8 +40,6 @@ def get_attribute(instance, attrs):
     return instance
 
 
-
-
 class DictAndList(list):
     '''
     A list backed by an ordered dict (formed from its values),
@@ -67,3 +65,17 @@ class DictAndList(list):
         except TypeError:
             return self._odict[item]
 
+
+class can_peek:
+
+    def __init__(self, iterator):
+        self._list = list(iterator)
+
+    def peek(self):
+        if not self._list:
+            raise StopIteration()
+        return self._list[0]
+
+    def __iter__(self):
+        while self._list:
+            yield self._list.pop(0)

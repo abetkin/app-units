@@ -8,7 +8,7 @@ from django.http import HttpResponse, JsonResponse
 from rest_framework import generics, serializers
 
 from appunits import AppUnit, ContextAttribute
-from appunits.dj import ViewUnit
+from appunits.dj import ViewUnit, unit_dispatch
 from .models import Cat
 from appunits.marks import Mark
 
@@ -41,22 +41,6 @@ class CatSerializer(Serialize):
     happy = serializers.BooleanField()
 
 
-class AppAwareView(View):
-
-    app_units = ()
-    publish_attrs = ('request_params',)
-    share_context = True
-
-    @property
-    def request_params(self):
-        return self.request.GET
-
-
-    def dispatch(self, request, *args, **kwargs):
-        self.app = AppUnit.make('main', self.app_units, [self])
-        self.app.run()
-        return super(AppAwareView, self).dispatch(request, *args, **kwargs)
-
 
 class ViewCats(ViewUnit):
 
@@ -67,11 +51,14 @@ class ViewCats(ViewUnit):
     #     ]
     depends_on = [CatSerializer]
 
+    def rsfgg(self):
+        1
+
     def view(self, request):
         obj = self.deps[CatSerializer].result
         return JsonResponse(obj)
 
-view_cats = ViewCats().as_view()
+view_cats = ViewCats.as_view()
 
 class Viu(View):
 
@@ -80,27 +67,10 @@ class Viu(View):
     #     return [
     #         Serialize(context_objects=[{'data': self.request.GET}]),
     #     ]
-    @ViewCats()
+    @unit_dispatch(ViewCats)
     def dispatch(self, request):
-        obj = Viu.dispatch.deps[CatSerializer].result
-        return ['request',
-        'requestefwwwwwwwwwwwwwwwwwww',
-        'effffffffffffffffffffffffffffff',
-        'fewwwwwwwwwwwwwwwwwwwwwwwwww',
-        'fewwwwwwwwwwwwwwwwwwwwww',
-        ]
+        obj = self._unit_.deps[CatSerializer].result
         return JsonResponse(obj)
 
 
 viu = Viu.as_view()
-
-
-class ShowCats(AppAwareView):
-
-    app_units = (Serialize,)
-
-    def get(self, request):
-        obj = self.app.deps[Serialize].result
-        return JsonResponse(obj)
-
-show_cats = ShowCats.as_view()

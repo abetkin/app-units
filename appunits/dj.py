@@ -1,5 +1,5 @@
 from functools import update_wrapper, wraps, partial
-from copy import copy
+import types
 
 from .base import AppUnit
 from .util import NOT_SET
@@ -28,10 +28,10 @@ class UnitsIterator:
             self.current_unit = self.unit
 
     def go(self, unit):
-        if (self.all_units.index(self.current_unit)
-                > self.all_units.key_index(unit)):
+        try:
+            self.unit.run(stop_after=unit)
+        except StopIteration:
             return self.repeat(unit=unit)
-        self.unit.run(stop_after=unit)
         self.current_unit = self.all_units[unit]
         return self
 
@@ -83,8 +83,6 @@ class UnitResponse(HttpResponse):
 
 class ViewUnit(AppUnit):
 
-    view = None
-
     publish_attrs = ['request']
 
     def prepare_run(self, request, *args, **kwargs):
@@ -92,12 +90,18 @@ class ViewUnit(AppUnit):
         self.view_args = args
         self.view_kwargs = kwargs
 
-    def as_view(self):
-        if not self.view:
-            raise NotImplementedError('No "view" callable in %s' % self)
+    @classmethod
+    def as_view(cls, *unit_args, view_func=None, **unit_kwargs):
 
         def view(request, *args, **kwargs):
-            unit = copy(self)
+            unit = cls(*unit_args, **unit_kwargs)
+            if view_func:
+                unit.view = view_func
+            if view_func and isinstance(view_func, types.MethodType):
+                # make unit accessible from view if it's class based
+                view_func.__self__._unit_ = unit
+            if not hasattr(unit, 'view'):
+                raise NotImplementedError('No "view" callable in %s' % unit)
             is_test_client = 'units.stop_after' in request.META
             if is_test_client:
                 kwargs.update(stop_after=request.META['units.stop_after'])
@@ -110,10 +114,25 @@ class ViewUnit(AppUnit):
             return unit.result
 
         # take name and docstring from class
-        update_wrapper(view, self.__class__, updated=())
-        # and possible attributes from the view function
-        update_wrapper(view, self.view, assigned=())
+        update_wrapper(view, cls, updated=())
+        try:
+            view_function = view_func or cls.view
+            # and possible attributes from the view function
+            update_wrapper(view, view_function, assigned=())
+        except AttributeError:
+            pass
         return view
+
+    def main(self):
+        return self.view(self.request, *self.view_args, **self.view_kwargs)
+
+
+class unit_dispatch:
+
+    def __init__(self, unit_cls, *unit_args, **unit_kwargs):
+        self.unit_cls = unit_cls
+        self.unit_args = unit_args
+        self.unit_kwargs = unit_kwargs
 
     def __get__(self, instance, owner):
         if instance is None:
@@ -121,12 +140,9 @@ class ViewUnit(AppUnit):
         decorated = getattr(self, '_decorated_func', None)
         dispatch = decorated.__get__(instance) if decorated \
                 else super(owner, instance).dispatch
-        self.view = dispatch
-        return self.as_view()
+        return self.unit_cls.as_view(*self.unit_args, view_func=dispatch,
+                                     **self.unit_kwargs)
 
     def __call__(self, f):
         self._decorated_func = f
         return self
-
-    def main(self):
-        return self.view(self.request, *self.view_args, **self.view_kwargs)

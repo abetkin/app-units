@@ -3,7 +3,7 @@ from functools import partial
 from collections import OrderedDict
 import itertools
 
-from .util import get_attribute, DictAndList, NOT_SET
+from .util import get_attribute, DictAndList, NOT_SET, can_peek
 from .util.mro import _mro
 from .util.deps import sort_by_deps, breadth_first
 
@@ -13,9 +13,6 @@ class UnitConfigError(Exception):
     pass
 
 class ProChainError(Exception):
-    pass
-
-class UnitsIterationError(Exception):
     pass
 
 
@@ -37,11 +34,6 @@ class AppUnit(metaclass=CollectMarksMeta):
         self.result = NOT_SET
 
     autorun_dependencies = True
-
-    def __copy__(self):
-        return self.__class__(identity=self.identity,
-                              depends_on=self.depends_on,
-                              context_objects=self.context_objects,)
 
     def prepare_unit(self, parents):
         '''
@@ -158,30 +150,35 @@ class AppUnit(metaclass=CollectMarksMeta):
         if isinstance(other, AppUnit):
             return self.identity == other.identity
 
-    def _iter_units(self):
-        yield from self.deps
-        yield self
-
-
     # Recursion should happen only when traversing
     #
 
     def run(self, *args, stop_after=None, **kwargs):
         if not getattr(self, 'run_session', None):
             self._prepare_run(*args, **kwargs)
-            self.run_session = self._iter_units()
 
-        def iterate():
-            unit = next(self.run_session)
-            if self.all_units.index(unit) > self.all_units.key_index(stop_after):
-                raise UnitsIterationError("Can't stop at %s: it has been "
-                                          "already run")
+            def iter_units():
+                yield from self.deps
+                yield self
+            self.run_session = can_peek(iter_units())
+
+        next_unit = self.run_session.peek()
+        if self.all_units.index(next_unit) \
+                > self.all_units.key_index(stop_after):
+            raise StopIteration()
 
         for unit in self.run_session:
-            if stop_after and self.all_units.index(unit.identity) \
+            unit.result = unit.main()
+            if stop_after is None:
+                continue
+            try:
+                next_unit = self.run_session.peek()
+            except StopIteration:
+                return
+            if self.all_units.index(next_unit) \
                     > self.all_units.key_index(stop_after):
                 return
-            unit.result = unit.main()
+
 
     def main(self):
         '''Can be overriden'''
