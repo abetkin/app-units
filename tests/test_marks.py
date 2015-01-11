@@ -8,7 +8,7 @@ class custom(mark):
 
     collect_into = '_numbers'
 
-    def build_mark(self, app):
+    def build(self, app):
         if self.source_function:
             return int(self.source_function())
         return int(self.value)

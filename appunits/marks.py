@@ -14,7 +14,7 @@ class Mark(metaclass=ABCMeta):
         self.source_function = f
         return self
 
-    def build_mark(self, klass):
+    def build(self):
         '''
         Construct an instance from Mark. You should override this.
         '''
@@ -23,21 +23,28 @@ class Mark(metaclass=ABCMeta):
     @classmethod
     def _add_all(cls, marks_dict, klass):
         for key, mark in marks_dict.items():
-            try:
-                built_mark = mark.build_mark(klass)
-            except AttributeError:
-                built_mark = mark
-            # check if klass defines .collect_marks_into
-            if hasattr(klass, 'collect_marks_into'):
-                collect_into = klass.collect_marks_into
-                if not isinstance(collect_into, str):
-                    collect_into = collect_into(mark)
-            else:
+            build = getattr(klass, 'build_mark', None)
+            if build:
+                build = build(mark)
+            if build is None:
+                build = getattr(mark, 'build', None)
+                if build:
+                    build = build()
+            if build is not None:
+                mark = build
+
+            # check if klass defines collect_marks_into
+            collect_into = getattr(klass, 'collect_marks_into', None)
+            if callable(collect_into):
+                collect_into = collect_into(mark)
+            if collect_into is None:
                 collect_into = getattr(mark, 'collect_into', Mark.collect_into)
+                if callable(collect_into):
+                    collect_into = collect_into()
             if not collect_into in klass.__dict__:
-                setattr(klass, collect_into, OrderedDict([(key, built_mark)]))
+                setattr(klass, collect_into, OrderedDict([(key, mark)]))
             else:
-                getattr(klass, collect_into)[key] = built_mark
+                getattr(klass, collect_into)[key] = mark
 
 
 class CollectMarksMeta(type):
