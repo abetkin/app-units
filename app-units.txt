@@ -3,7 +3,7 @@ standard errors (not enough context)
 
 ## pro
 
-parent may not be an AppUnit
+parent may not be a Unit
 to be able to use external objects as context (proxy?)
 custom lookup policy
 

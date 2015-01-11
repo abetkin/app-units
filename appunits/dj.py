@@ -1,7 +1,7 @@
 from functools import update_wrapper, wraps, partial
 import types
 
-from .base import AppUnit
+from .base import Unit
 from .util import NOT_SET
 
 from django import test
@@ -81,7 +81,7 @@ class UnitsIterator:
 class UnitResponse(HttpResponse):
     pass
 
-class ViewUnit(AppUnit):
+class ViewUnit(Unit):
 
     publish_attrs = ['request']
 

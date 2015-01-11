@@ -15,8 +15,7 @@ class UnitConfigError(Exception):
 class ProChainError(Exception):
     pass
 
-
-class AppUnit(metaclass=CollectMarksMeta):
+class Unit(metaclass=CollectMarksMeta):
     '''
     '''
     depends_on = ()
@@ -64,7 +63,7 @@ class AppUnit(metaclass=CollectMarksMeta):
             container = type(unit.depends_on) # todo forbid iterator
             def it():
                 for dep in unit.depends_on:
-                    if isinstance(dep, type) and issubclass(dep, AppUnit):
+                    if isinstance(dep, type) and issubclass(dep, Unit):
                         dep = dep()
                     if dep in all_units:
                         dep = all_units[dep]
@@ -132,7 +131,7 @@ class AppUnit(metaclass=CollectMarksMeta):
             else:
                 chain.append(obj)
             obj.__pro__ = _mro(obj.context_objects,
-                               partial(AppUnit.get_pro, chain=chain))
+                               partial(Unit.get_pro, chain=chain))
         return obj.__pro__
 
     def __repr__(self):
@@ -147,7 +146,7 @@ class AppUnit(metaclass=CollectMarksMeta):
         return hash(self.identity)
 
     def __eq__(self, other):
-        if isinstance(other, AppUnit):
+        if isinstance(other, Unit):
             return self.identity == other.identity
 
     # Recursion should happen only when traversing
@@ -162,10 +161,11 @@ class AppUnit(metaclass=CollectMarksMeta):
                 yield self
             self.run_session = can_peek(iter_units())
 
-        next_unit = self.run_session.peek()
-        if self.all_units.index(next_unit) \
-                > self.all_units.key_index(stop_after):
-            raise StopIteration()
+        if stop_after is not None:
+            next_unit = self.run_session.peek()
+            if self.all_units.index(next_unit) \
+                    > self.all_units.key_index(stop_after):
+                raise StopIteration()
 
         for unit in self.run_session:
             unit.result = unit.main()

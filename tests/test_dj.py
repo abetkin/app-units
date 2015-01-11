@@ -9,7 +9,7 @@ import django
 django.setup()
 
 from app.views import Serialize
-from appunits import AppUnit
+from appunits import Unit
 
 # TODO adapters
 class Params:
@@ -20,6 +20,6 @@ class Params:
         'happy': True,
     }
 
-app = AppUnit.make('main', [Serialize], [Params])
+app = Unit.make('main', [Serialize], [Params])
 app.run()
 print(app.deps[Serialize].result)

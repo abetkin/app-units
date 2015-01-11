@@ -1,5 +1,6 @@
 # coding: utf-8
 import json
+from collections import OrderedDict
 
 from django.shortcuts import render
 from django.views.generic import View
@@ -7,24 +8,26 @@ from django.http import HttpResponse, JsonResponse
 
 from rest_framework import generics, serializers
 
-from appunits import AppUnit, ContextAttribute
+from appunits import Unit, ContextAttribute
 from appunits.dj import ViewUnit, unit_dispatch
 from .models import Cat
 from appunits.marks import Mark
 
-class Filter(AppUnit):
+class Filter(Unit):
     1
 
-class Serialize(AppUnit):
+class Serialize(Unit):
     data = ContextAttribute('data')
 
-    COLLECT_INTO = '_declared_fields'
+    collect_into = '_declared_fields'
     Mark.register(serializers.Field)
 
     def get_object(self):
         class srlzer_class(serializers.Serializer):
             pass
-        srlzer_class._declared_fields = self._declared_fields
+        srlzer_class._declared_fields = OrderedDict(
+            (k,v) for k,v in self._marks.items()
+            if isinstance(v, serializers.Field))
         srlzer = srlzer_class(data=self.data)
         if srlzer.is_valid():
             return srlzer.data

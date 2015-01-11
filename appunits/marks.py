@@ -7,6 +7,8 @@ from .util import common_superclass
 
 class Mark(metaclass=ABCMeta):
 
+    collect_into = '_marks'
+
     def __init__(self, **kwargs):
         self.source_function = None
         self.__dict__.update(kwargs)
@@ -15,33 +17,24 @@ class Mark(metaclass=ABCMeta):
         self.source_function = f
         return self
 
-    def build(self, klass):
+    def build_mark(self, klass):
         '''
         Construct an instance from Mark. You should override this.
         '''
         return self
 
     @classmethod
-    def build_all(cls, marks_dict, klass, build=None):
-        for key, m in marks_dict.items():
-            build = build or m.__class__.build
-            marks_dict[key] = build(m, klass)
-        return marks_dict
-
-    @classmethod
     def _add_all(cls, marks_dict, klass):
-        if not marks_dict:
-            return
-        supercls = common_superclass(marks_dict.values())
-        if Mark in supercls.__mro__:
-            build_all = supercls.build_all
-        else:
-            # was registered via abc
-            build_all = partial(Mark.build_all, build=Mark.build)
-        built_dict = build_all(marks_dict, klass)
-        collect_into = getattr(supercls, 'COLLECT_INTO', None) \
-                or getattr(klass, 'COLLECT_INTO', None) or '_marks'
-        setattr(klass, collect_into, built_dict)
+        for key, mark in marks_dict.items():
+            try:
+                built_mark = mark.build_mark(klass)
+            except AttributeError:
+                built_mark = mark
+            collect_into = getattr(mark, 'collect_into', Mark.collect_into)
+            if not collect_into in klass.__dict__:
+                setattr(klass, collect_into, OrderedDict([(key, built_mark)]))
+            else:
+                getattr(klass, collect_into)[key] = built_mark
 
 
 class CollectMarksMeta(type):

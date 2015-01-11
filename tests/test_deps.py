@@ -1,4 +1,4 @@
-from appunits import AppUnit as App
+from appunits import Unit as App
 from appunits.util import case
 
 a = App('a')

@@ -1,20 +1,20 @@
 
 from collections import OrderedDict
 
-from appunits import Mark as mark, AppUnit
+from appunits import Mark as mark, Unit
 from appunits.util import case
 
 class custom(mark):
 
-    COLLECT_INTO = '_numbers'
+    collect_into = '_numbers'
 
-    def build(self, app):
+    def build_mark(self, app):
         if self.source_function:
             return int(self.source_function())
         return int(self.value)
 
 
-class MarkedApp(AppUnit):
+class MarkedApp(Unit):
 
     mark1 = mark2 = custom(value=1)
 
