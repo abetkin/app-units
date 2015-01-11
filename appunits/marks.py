@@ -66,8 +66,9 @@ class CollectMarksMeta(type):
             marks_dict[key] = obj
 
         # clear the namespace
-        for name in marks_dict:
-            del namespace[name]
+        for _name in marks_dict:
+            del namespace[_name]
+
 
         klass = type.__new__(cls, name, bases, namespace)
         Mark._add_all(marks_dict, klass)

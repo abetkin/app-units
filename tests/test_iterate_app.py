@@ -20,7 +20,7 @@ class C(App):
     autorun_dependencies = False
 
     def run(self):
-        self.all_units[B].run()
+        self.all_units[B].main()
         lines.append('C')
 
 
@@ -33,13 +33,13 @@ class Main(App):
 
 main = Main.make()
 
-main.autorun(stop_after=A)
+main.run(stop_after=A)
 case.assertSequenceEqual(lines, ['A'])
-main.autorun(stop_after=B)
+main.run(stop_after=B)
 case.assertSequenceEqual(lines, ['A'])
 
-main.autorun(stop_after=C)
+main.run(stop_after=C)
 case.assertSequenceEqual(lines, ['A', 'B', 'C'])
-main.autorun()
+main.run()
 case.assertSequenceEqual(lines, ['A', 'B', 'C', 'D'])
 

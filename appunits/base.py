@@ -3,7 +3,7 @@ from functools import partial
 from collections import OrderedDict
 import itertools
 
-from .util import get_attribute
+from .util import get_attribute, DictAndList, NOT_SET
 from .util.mro import _mro
 from .util.deps import sort_by_deps, breadth_first
 
@@ -15,10 +15,9 @@ class UnitConfigError(Exception):
 class ProChainError(Exception):
     pass
 
-# TODO states: prepared, app1, app2, ...
-# TODO ability to specify order manually!!
-# incapsulation!
-# option: ignore warnings
+class UnitsIterationError(Exception):
+    pass
+
 
 class AppUnit(metaclass=CollectMarksMeta):
     '''
@@ -33,31 +32,33 @@ class AppUnit(metaclass=CollectMarksMeta):
             self.identity = self.__class__
         if depends_on is not None:
             self.depends_on = depends_on
-        # elif not hasattr(self, 'depends_on'):
-        #     self.depends_on = []
         if context_objects is not None:
             self.context_objects = context_objects
-        # elif not hasattr(self, 'context_objects'):
-        #     self.context_objects = []
+        self.result = NOT_SET
 
     autorun_dependencies = True
 
-    # -> prepare_unit ?
-    def prepare_hook(self, parents):
+    def __copy__(self):
+        return self.__class__(identity=self.identity,
+                              depends_on=self.depends_on,
+                              context_objects=self.context_objects,)
+
+    def prepare_unit(self, parents):
         '''
         A hook that can be used, for example,
         for sharing some of the parent's context with the child.
         '''
-        self.context_objects = list(self.context_objects)
-        self.context_objects.extend(parents.values())
+        to_add = [obj for obj in parents.values()
+                  if obj not in self.context_objects]
+        if to_add:
+            self.context_objects = list(self.context_objects)
+            self.context_objects.extend(to_add)
 
     def prepare_run(self, *args, **kwargs):
         self.run_args = getattr(self, 'run_args', args)
         self.run_kwargs = getattr(self, 'run_kwargs', kwargs)
 
-    # -> _prepare_run ?
-    # all_units - list interface?
-    def prepare(self, *run_args, **run_kwargs):
+    def _prepare_run(self, *run_args, **run_kwargs):
         '''TODO what it does? self.all_units ?
         '''
         self.prepare_run(*run_args, **run_kwargs)
@@ -105,14 +106,12 @@ class AppUnit(metaclass=CollectMarksMeta):
             for units_set in sort_by_deps(deps_dict):
                 yield from sorted(units_set, key=UnitsOrder)
 
-        all_units = list(units())
-        # providing a nicer interface
-        all_units_dict = OrderedDict((u.identity, u) for u in all_units)
+        all_units = DictAndList((u.identity, u) for u in units())
 
         ## Set all units' dependencies ##
 
         for unit in all_units:
-            unit.all_units = all_units_dict
+            unit.all_units = all_units
             unit_deps = set(unit.deps) if unit.autorun_dependencies else set()
             for dep in unit.deps:
                 unit_deps |= set(dep.deps)
@@ -120,14 +119,14 @@ class AppUnit(metaclass=CollectMarksMeta):
 
         # providing a nicer interface
         for unit in all_units:
-            unit.deps = OrderedDict((u.identity, u) for u in unit.deps)
+            unit.deps = DictAndList((u.identity, u) for u in unit.deps)
 
         ## Set the context objects ##
 
         for unit, parents in itertools.chain(parents.items(),
                                              [(self, [])]):
             parents = OrderedDict((u.identity, u) for u in parents)
-            unit.prepare_hook(parents)
+            unit.prepare_unit(parents)
             unit.get_pro()
 
     def get_pro(obj, chain=None):
@@ -144,16 +143,13 @@ class AppUnit(metaclass=CollectMarksMeta):
                                partial(AppUnit.get_pro, chain=chain))
         return obj.__pro__
 
-    # @classmethod
-    # def make(cls, *args, **kwargs):
-    #     unit = cls(*args, **kwargs)
-    #     unit.prepare()
-    #     return unit
-
     def __repr__(self):
         return 'Unit %s' % repr(self.identity)
 
-    __str__ = __repr__
+    def __str__(self):
+        if isinstance(self.identity, type):
+            return self.identity.__name__
+        return str(self.identity)
 
     def __hash__(self):
         return hash(self.identity)
@@ -163,43 +159,37 @@ class AppUnit(metaclass=CollectMarksMeta):
             return self.identity == other.identity
 
     def _iter_units(self):
-        yield from self.deps.values()
+        yield from self.deps
         yield self
 
 
     # Recursion should happen only when traversing
     #
 
-    # TODO: autorun -> run, run -> main
-
-    def autorun(self, *args, stop_after=None, **kwargs):
-        # FIXME JUST ITERATOR
+    def run(self, *args, stop_after=None, **kwargs):
         if not getattr(self, 'run_session', None):
-            self.prepare(*args, **kwargs)
+            self._prepare_run(*args, **kwargs)
             self.run_session = self._iter_units()
 
-        def stop_here(unit):
-            if stop_after is None:
-                return
-            all_units = tuple(self.all_units.keys())
-            if isinstance(stop_after, int):
-                return all_units.index(unit.identity) > stop_after
-            return (all_units.index(unit.identity) >
-                    all_units.index(stop_after))
+        def iterate():
+            unit = next(self.run_session)
+            if self.all_units.index(unit) > self.all_units.key_index(stop_after):
+                raise UnitsIterationError("Can't stop at %s: it has been "
+                                          "already run")
 
         for unit in self.run_session:
-            if stop_here(unit):
-                return unit.result
-            unit.result = unit.run()
+            if stop_after and self.all_units.index(unit.identity) \
+                    > self.all_units.key_index(stop_after):
+                return
+            unit.result = unit.main()
 
-        return self.result
-
-    def run(self):
+    def main(self):
         '''Can be overriden'''
 
 
     # TODO!! detect cycles & invalid config
     # TODO test units with same deps
+
 
 class ContextAttribute:
     '''
@@ -236,5 +226,3 @@ class ContextAttribute:
 
 
 # publish_attrs = ('request', 'view') : inheritance ?
-
-# TODO: dot access attr.attr2

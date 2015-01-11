@@ -30,7 +30,7 @@ class Serialize(AppUnit):
             return srlzer.data
         return srlzer.errors
 
-    def run(self):
+    def main(self):
         return self.get_object()
 
 
@@ -54,7 +54,7 @@ class AppAwareView(View):
 
     def dispatch(self, request, *args, **kwargs):
         self.app = AppUnit.make('main', self.app_units, [self])
-        self.app.autorun()
+        self.app.run()
         return super(AppAwareView, self).dispatch(request, *args, **kwargs)
 
 
@@ -83,6 +83,12 @@ class Viu(View):
     @ViewCats()
     def dispatch(self, request):
         obj = Viu.dispatch.deps[CatSerializer].result
+        return ['request',
+        'requestefwwwwwwwwwwwwwwwwwww',
+        'effffffffffffffffffffffffffffff',
+        'fewwwwwwwwwwwwwwwwwwwwwwwwww',
+        'fewwwwwwwwwwwwwwwwwwwwww',
+        ]
         return JsonResponse(obj)
 
 

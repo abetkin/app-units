@@ -21,5 +21,5 @@ class Params:
     }
 
 app = AppUnit.make('main', [Serialize], [Params])
-app.autorun()
+app.run()
 print(app.deps[Serialize].result)

@@ -15,4 +15,4 @@ case.assertSequenceEqual(list(main.deps.values()),
 
 ##
 
-main.run()
+main.main()

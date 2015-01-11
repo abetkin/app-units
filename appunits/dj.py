@@ -1,7 +1,8 @@
 from functools import update_wrapper, wraps, partial
-import types
+from copy import copy
 
 from .base import AppUnit
+from .util import NOT_SET
 
 from django import test
 from django.http import HttpResponse
@@ -21,45 +22,60 @@ class UnitsIterator:
     def __init__(self, unit, repeat, current_unit):
         self.unit = unit
         self.repeat = repeat
-        self.current_unit = self[current_unit]
+        if current_unit is not None:
+            self.current_unit = self.unit.all_units[current_unit]
+        else:
+            self.current_unit = self.unit
 
     def go(self, unit):
-        all_units = tuple(self.unit.all_units.keys())
-        if not isinstance(unit, int):
-            unit = all_units.index(unit)
-        if all_units.index(self.identity) > unit:
+        if (self.all_units.index(self.current_unit)
+                > self.all_units.key_index(unit)):
             return self.repeat(unit=unit)
-        self.unit.autorun(stop_after=unit)
-        self.current_unit = self[unit]
+        self.unit.run(stop_after=unit)
+        self.current_unit = self.all_units[unit]
         return self
 
     def __getattr__(self, name):
         return getattr(self.current_unit, name)
 
     def _repr_pretty_(self, p, cycle):
+        # black magic
         from IPython.lib import pretty
         if cycle:
             p.text('UnitsIterator(..)')
             return
-        p.text('Application units:')
-        # all_units = tuple()
-        # with p.group(2):
-        #     self.all_units.index
-        #     p.text(self.wrapped_func.__name__) #(a=1,b=..)
-        #     p.text(' returned')
-        #     p.breakable()
-        #     p.text( pretty(self.rv))
+        max_length = max(len("%d %s" % (i, str(unit)))
+                for i, unit in enumerate(self.all_units))
+        def print_units(p, units_enum):
+            with p.group(2):
+                for i, unit in units_enum:
+                    p.break_()
+                    id_and_name = ("%d %s" % (i, str(unit))
+                            ).ljust(max_length + 1)
+                    p.text(id_and_name)
+                    with p.group(len(id_and_name)):
+                        if unit.result is NOT_SET:
+                            result = '-'
+                        else:
+                            result = pretty.pretty(unit.result)
+                        if len(result) > 120:
+                            result = '%s(...)' % unit.result.__class__.__name__
+                        p.text(result)
+        all_units = enumerate(self.all_units)
+        current = self.all_units.index(self.current_unit)
+        def units_run():
+            for i, unit in all_units:
+                yield i, unit
+                if i == current:
+                    break
+        p.text('Units run:')
+        print_units(p, list(units_run()))
 
-    # full info:
-    # N# app:\n result
-    # To run:\n ..
-
-    def __getitem__(self, unit):
-        if unit is None:
-            return self.unit
-        if isinstance(unit, int):
-            return tuple(self.unit.all_units.values())[unit]
-        return self.unit.all_units[unit]
+        units_to_run = list(all_units)
+        if units_to_run:
+            p.break_()
+            p.text('Units to run:')
+            print_units(p, units_to_run)
 
 
 class UnitResponse(HttpResponse):
@@ -81,16 +97,17 @@ class ViewUnit(AppUnit):
             raise NotImplementedError('No "view" callable in %s' % self)
 
         def view(request, *args, **kwargs):
+            unit = copy(self)
             is_test_client = 'units.stop_after' in request.META
             if is_test_client:
                 kwargs.update(stop_after=request.META['units.stop_after'])
-            self.autorun(request, *args, **kwargs)
+            unit.run(request, *args, **kwargs)
             if is_test_client:
                 # HttpResponse hasn't been got yet
                 empty = UnitResponse()
-                empty._unit = self
+                empty._unit = unit
                 return empty
-            return self.result
+            return unit.result
 
         # take name and docstring from class
         update_wrapper(view, self.__class__, updated=())
@@ -111,5 +128,5 @@ class ViewUnit(AppUnit):
         self._decorated_func = f
         return self
 
-    def run(self):
+    def main(self):
         return self.view(self.request, *self.view_args, **self.view_kwargs)

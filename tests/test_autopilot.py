@@ -20,7 +20,7 @@ class C(App):
     autorun_dependencies = False
 
     def run(self):
-        self.all_units[B].run()
+        self.all_units[B].main()
 
 
 class Main(App):
@@ -34,7 +34,7 @@ main = Main.make()
 print(list(main.deps.keys()))
 print('#####')
 
-main.autorun('fef')
+main.run('fef')
 
 
 # check STATE

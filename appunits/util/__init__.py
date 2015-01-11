@@ -38,3 +38,32 @@ def get_attribute(instance, attrs):
         else:
             instance = getattr(instance, attr)
     return instance
+
+
+
+
+class DictAndList(list):
+    '''
+    A list backed by an ordered dict (formed from its values),
+    providing element access by index as well as by key.
+
+    Dict keys can not be ints.
+    '''
+
+    def __init__(self, *args, **kwargs):
+        self._odict = collections.OrderedDict(*args, **kwargs)
+        assert all(not isinstance(key, int) for key in self._odict), \
+                "Dict keys can not be ints."
+        super().__init__(self._odict.values())
+
+    def key_index(self, key):
+        if isinstance(key, int):
+            return key
+        return self.index(self[key])
+
+    def __getitem__(self, item):
+        try:
+            return super().__getitem__(item)
+        except TypeError:
+            return self._odict[item]
+
